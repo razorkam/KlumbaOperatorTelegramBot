@@ -1,6 +1,6 @@
 import logging
 from logging.handlers import RotatingFileHandler
-from TelegramWorker import TgWorker
+from source.TelegramWorker import TgWorker
 
 LOG_MAX_SIZE = 2 * 1024 * 1024 # 2 mbytes
 

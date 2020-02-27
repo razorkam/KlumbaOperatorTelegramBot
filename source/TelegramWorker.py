@@ -1,7 +1,7 @@
-from UserStore import UserStore
-from User import User
-import creds
-from TelegramCommandsHandler import *
+from .UserStore import UserStore
+from .User import User
+from . import creds
+from .TelegramCommandsHandler import *
 import requests
 import logging
 import time
@@ -11,19 +11,21 @@ class TgWorker:
     USERS = UserStore()
     MESSAGE_UPDATE_TYPE = 'message'
     CBQ_UPDATE_TYPE = 'callback_query'
-    # last update offset / incominng msg limit / long polling timeout / allowed messages types
+    # last update offset / incoming msg limit / long polling timeout / allowed messages types
     GET_UPDATES_PARAMS = {'offset': 0, 'limit': 100, 'timeout': 30, 'allowed_updates': [MESSAGE_UPDATE_TYPE,
                                                                                         CBQ_UPDATE_TYPE]}
     REQUESTS_TIMEOUT = 1.5 * GET_UPDATES_PARAMS['timeout']
-    REQUESTS_MAX_ATTEMPTS=5
-    GLOBAL_LOOP_ERROR_TIMEOUT = 60 # seconds
+    REQUESTS_MAX_ATTEMPTS = 5
+    GLOBAL_LOOP_ERROR_TIMEOUT = 60  # seconds
     SESSION = requests.session()
     CommandsHandler = None
 
     REQUEST_PHONE_PARAMS = {'text': TextSnippets.REQUEST_PHONE_NUMBER_MESSAGE,
                             'reply_markup': {
                                 'keyboard': [[{'text': TextSnippets.REQUEST_PHONE_NUMBER_BUTTON,
-                                               'request_contact': True}]], 'one_time_keyboard': True}}
+                                               'request_contact': True}]],
+                                'one_time_keyboard': True,
+                                'resize_keyboard': True}}
 
     def __init__(self):
         self.CommandsHandler = TelegramCommandsHandler(self)
@@ -51,16 +53,28 @@ class TgWorker:
 
         return {}
 
-    def send_message(self, chat_id, message_object, formatting='Markdown'):
+    def send_message(self, chat_id, message_object, formatting='Markdown', disable_web_preview=True):
         message_object['chat_id'] = chat_id
         message_object['parse_mode'] = formatting
+        message_object['disable_web_page_preview'] = disable_web_preview
         return self.send_request('sendMessage', message_object, 'Message sending')
 
-    def edit_message(self, chat_id, message_id, message_object, formatting='Markdown'):
+    def edit_message(self, chat_id, message_id, message_object, formatting='Markdown', disable_web_preview=True):
         message_object['chat_id'] = chat_id
         message_object['message_id'] = message_id
         message_object['parse_mode'] = formatting
+        message_object['disable_web_page_preview'] = disable_web_preview
         return self.send_request('editMessageText', message_object, 'Message editing')
+
+    # edit current "working" message of user
+    def edit_user_wm(self, user, message_object, formatting='Markdown', from_callback=False):
+        res = self.edit_message(user.get_chat_id(), user.get_wm_id(), message_object, formatting)
+
+        if res or from_callback:
+            return res
+
+        res = self.send_message(user.get_chat_id(), message_object, formatting)
+        user.set_wm_id(res['result']['message_id'])
 
     def delete_message(self, chat_id, message_id):
         params = {'chat_id': chat_id, 'message_id': message_id}
@@ -79,9 +93,17 @@ class TgWorker:
         except Exception as e:
             logging.error('Handling command: %s', e)
 
+    def handle_prauth_messages(self, user):
+        for m_id in user.get_prauth_messages():
+            self.delete_message(user.get_chat_id(), m_id)
+
+        user.clear_prauth_messages()
+
     def handle_message(self, message):
         user_id = message['from']['id']
         chat_id = message['chat']['id']
+        user = None
+        sent_prauth_msg_id = None
 
         # has user been already cached?-
         if self.USERS.has_user(user_id):
@@ -104,17 +126,35 @@ class TgWorker:
                 except Exception:
                     secondary_phone_params = self.REQUEST_PHONE_PARAMS.copy()
                     secondary_phone_params['text'] = TextSnippets.AUTHORIZATION_UNSUCCESSFUL
-                    self.send_message(chat_id, secondary_phone_params)
+                    res = self.send_message(chat_id, secondary_phone_params)['result']
+                    sent_prauth_msg_id = res['message_id']
                 else:
-                    self.send_message(chat_id,
-                                      {'text': TextSnippets.AUTHORIZATION_SUCCESSFUL +
-                                               '\n' + TextSnippets.BOT_HELP_TEXT})
+                    # remove phone requesting keyboard now
+                    res = self.send_message(chat_id, {'text': TextSnippets.AUTHORIZATION_SUCCESSFUL,
+                                                'reply_markup': {'remove_keyboard': True}})['result']
+
+                    sent_prauth_msg_id = res['message_id']
+
+                    # res = self.send_message(chat_id, {'text': TextSnippets.BOT_HELP_TEXT})
+
+                    user.add_prauth_message(message['message_id'])
+                    user.add_prauth_message(sent_prauth_msg_id)
+
+                    self.handle_prauth_messages(user)
+                    res = self.CommandsHandler.get_deals_list(user)
+                    user.set_wm_id(res['result']['message_id'])
+                    return
 
             elif user.is_authorized():
                 self.handle_user_command(message)
+                return # no pre-authorize messages
         else:
-            self.send_message(chat_id, self.REQUEST_PHONE_PARAMS)
-            self.USERS.add_user(user_id, User())
+            res = self.send_message(chat_id, self.REQUEST_PHONE_PARAMS)['result']
+            sent_prauth_msg_id = res['message_id']
+            user = self.USERS.add_user(user_id, User())
+
+        user.add_prauth_message(message['message_id'])
+        user.add_prauth_message(sent_prauth_msg_id)
 
     def handle_cb_query(self, cb):
         try:
@@ -134,7 +174,8 @@ class TgWorker:
             logging.error('Handling TG response update: %s', e)
 
     def base_response_handler(self, json_response):
-        print(json_response)
+        # TODO: remove in production
+        # print(json_response)
 
         try:
             max_update_id = self.GET_UPDATES_PARAMS['offset']

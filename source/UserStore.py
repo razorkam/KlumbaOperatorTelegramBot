@@ -36,6 +36,8 @@ class UserStore:
         self._user_store[id] = user
         self._is_synchronized = False
 
+        return user
+
     def authorize(self, id, phone_number):
         try:
             user = self._user_store[id]
