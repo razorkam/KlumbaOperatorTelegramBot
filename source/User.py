@@ -1,83 +1,56 @@
 from enum import Enum
+from . import creds
 
 
 class UserState(Enum):
-    PHONE_NUMBER_REQUESTED = 1
+    PASSWORD_REQUESTED = 1
     AUTHORIZED = 2
 
 
 class User:
-    _DEALS_PER_PAGE = 3
-    _total_deals = 0
-    _deals = None
     _working_message_id = None
-    preauthorize_msg_list = []
-    _deal_cur_ptr = None
-    _deal_prev_ptr = None
+
+    # storing encoded photos
+    photos_list = []
 
     def __init__(self):
-        self._phone_number = None
-        self._state = UserState.PHONE_NUMBER_REQUESTED
+        self._password = None
+        self._state = UserState.PASSWORD_REQUESTED
         self._chat_id = None
 
     # pickle serializing fields
     def __getstate__(self):
-        return self._chat_id, self._state, self._phone_number, self._working_message_id
+        return self._chat_id, self._state, self._password
 
     def __setstate__(self, dump):
-        self._chat_id, self._state, self._phone_number, self._working_message_id = dump
+        self._chat_id, self._state, self._password = dump
 
-    # add pre-auth message to delete later
-    def add_prauth_message(self, message_id):
-        self.preauthorize_msg_list.append(message_id)
-
-    # delete all preauth messages from chat, if so
-    def get_prauth_messages(self):
-        return self.preauthorize_msg_list
-
-    def clear_prauth_messages(self):
-        self.preauthorize_msg_list.clear()
-
-    def is_number_requested(self):
-        return self._state == UserState.PHONE_NUMBER_REQUESTED
+    def is_pass_requested(self):
+        return self._state == UserState.PASSWORD_REQUESTED
 
     def is_authorized(self):
-        return self._state == UserState.AUTHORIZED
+        return self._state == UserState.AUTHORIZED and self._password == creds.GLOBAL_AUTH_PASSWORD
 
-    def authorize(self, phone_number):
+    def authorize(self, password):
         self._state = UserState.AUTHORIZED
-        phone_number.replace('+', '')
-        self._phone_number = phone_number
+        self._password = password
 
     def unauthorize(self):
-        self._state = UserState.PHONE_NUMBER_REQUESTED
-        self._phone_number = None
+        self._state = UserState.PASSWORD_REQUESTED
+        self._password = None
         self._chat_id = None
 
-    def get_phone_numer(self):
-        return self._phone_number
+    def get_password(self):
+        return self._password
 
     def get_chat_id(self):
         return self._chat_id
 
-    def get_deals(self):
-        return self._deals
+    def add_deal_photo(self, photo):
+        self.photos_list.append(photo)
 
-    def get_total_deals_num(self):
-        return self._total_deals
+    def get_deal_photos(self):
+        return self.photos_list
 
-    def set_deals(self, deals):
-        self._deals = deals
-        self._total_deals = len(deals)
-
-    def get_cur_deals(self):
-        if self._deals is None:
-            return {}
-
-        return self.get_deals()
-
-    def get_wm_id(self):
-        return self._working_message_id
-
-    def set_wm_id(self, wm_id):
-        self._working_message_id = wm_id
+    def clear_deal_photos(self):
+        self.photos_list.clear()

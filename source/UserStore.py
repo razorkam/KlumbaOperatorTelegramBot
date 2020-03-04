@@ -38,10 +38,10 @@ class UserStore:
 
         return user
 
-    def authorize(self, id, phone_number):
+    def authorize(self, id, password):
         try:
             user = self._user_store[id]
-            user.authorize(phone_number)
+            user.authorize(password)
             self._is_synchronized = False
         except Exception as e:
             logging.error('Authorizing user %s', e)

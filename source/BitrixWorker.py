@@ -1,10 +1,9 @@
 import requests
 from . import creds
 import logging
-from datetime import date
 
 from .BitrixFieldsAliases import *
-from .CbqData import *
+from . import TextSnippets
 
 
 class BitrixWorker:
@@ -13,19 +12,9 @@ class BitrixWorker:
     REQUESTS_MAX_ATTEMPTS = 3
 
     TgWorker = None
-    get_deals_params = None
 
     def __init__(self, TGWorker):
         self.TgWorker = TGWorker
-        self.get_deals_params = {'filter': {DEAL_COURIER_FIELD_ALIAS: None,
-                                            DEAL_STAGE_ALIAS: [DEAL_OPEN_STATUS_ID],
-                                            DEAL_DATE_ALIAS: None},
-                                 'select': [DEAL_ID_ALIAS, DEAL_ORDER_ALIAS, DEAL_DATE_ALIAS, DEAL_TIME_ALIAS,
-                                            DEAL_COMMENT_ALIAS, DEAL_RECIPIENT_NAME_ALIAS,
-                                            DEAL_RECIPIENT_SURNAME_ALIAS, DEAL_RECIPIENT_PHONE_ALIAS,
-                                            DEAL_ADDRESS_ALIAS, DEAL_SUM_ALIAS, DEAL_INCOGNITO_ALIAS, DEAL_FLAT_ALIAS,
-                                            DEAL_CONTACT_ID_ALIAS],
-                                 'order': {DEAL_TIME_ALIAS: 'ASC'}}
 
     def _send_request(self, user, method, params=None, custom_error_text='', notify_user=True):
         if params is None:
@@ -55,79 +44,35 @@ class BitrixWorker:
                 logging.error(error)
 
         if notify_user:
-            self.TgWorker.edit_user_wm(user, {'text': TextSnippets.ERROR_BITRIX_REQUEST,
-                                          'reply_markup': TO_DEALS_CALLBACK_DATA})
-        raise Exception()
+            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.ERROR_BITRIX_REQUEST})
 
-    def get_deals_list(self, user):
-        try:
-            courier_field = self._send_request(user, 'crm.deal.userfield.get', {'id': COURIER_FIELD_ID})
-            couriers = courier_field['result']['LIST']
-            target_courier_id = None
-            ethalon_pn = user.get_phone_numer().replace('+', '')[1:]
+        return None
 
-            for c in couriers:
-                courier_phone = c['VALUE'].split('/')[-1]
-                courier_phone = courier_phone.replace('-', '')
-                # simple checking for number format - +7, 7, 8 etc.
-                if ethalon_pn in courier_phone:
-                    target_courier_id = c['ID']
-                    break
+    def update_deal_image(self, user, deal_id):
+        photos_list = user.get_deal_photos()
 
-            # TODO: Testing only. don't check courier every query
-            # optimal caching / mapping of couriers
+        if not photos_list:
+            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.NO_PHOTOS_TEXT})
+            return
 
-            if target_courier_id is None:
-                return {}
+        deal = self._send_request(user, 'crm.deal.get', {'id': deal_id}, notify_user=False)
 
-            self.get_deals_params['filter'][DEAL_COURIER_FIELD_ALIAS] = target_courier_id
+        if not deal:
+            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.NO_SUCH_DEAL.format(deal_id)})
+            return
 
-            today = date.today().isoformat()
-            self.get_deals_params['filter'][DEAL_DATE_ALIAS] = today
+        photos_obj = {'id': deal_id, 'fields': {DEAL_SMALL_PHOTO_ALIAS: [], DEAL_BIG_PHOTO_ALIAS: []}}
 
-            deals = self._send_request(user, 'crm.deal.list', self.get_deals_params)
+        for photo in photos_list:
+            photos_obj['fields'][DEAL_SMALL_PHOTO_ALIAS].append({'fileData': [photo.name_small,
+                                                                              photo.encoded_data_small]})
 
-            more_deals = 'next' in deals
+            photos_obj['fields'][DEAL_BIG_PHOTO_ALIAS].append({'fileData': [photo.name_big,
+                                                                            photo.encoded_data_big]})
 
-            # getting next deal pages, if any
-            while more_deals:
-                get_next_deals_params = self.get_deals_params.copy()
-                get_next_deals_params['start'] = deals['next']
-                next_deals = self._send_request(user, 'crm.deal.list', get_next_deals_params)
-                deals['result'].extend(next_deals['result'])
-                more_deals = 'next' in next_deals
+        result = self._send_request(user, 'crm.deal.update', photos_obj)
 
-            return deals
+        if result['result']:
+            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.DEAL_UPDATED_TEXT})
 
-        except Exception as e:
-            logging.error('Getting deals %s', e)
-            self.TgWorker.edit_user_wm(user, {'text': TextSnippets.ERROR_GETTING_DEALS,
-                                              'reply_markup': TO_MAIN_MENU_BUTTON_OBJ})
-            return None
-
-    def change_deal_stage(self, user, deal_id, deal_new_stage):
-        try:
-            return self._send_request(user, 'crm.deal.update',
-                                      {'id': deal_id, 'fields': {DEAL_STAGE_ALIAS: deal_new_stage}})
-        except Exception as e:
-            self.TgWorker.edit_user_wm(user, {'text': TextSnippets.ERROR_HANDLING_DEAL_ACTION,
-                                              'reply_markup': TO_DEALS_BUTTON_OBJ})
-            return None
-
-    def get_contact_phone(self, user, contact_id):
-        if not contact_id:
-            return TextSnippets.FIELD_IS_EMPTY_PLACEHOLDER
-
-        try:
-            res = self._send_request(user, 'crm.contact.get',
-                                     {'id': contact_id}, notify_user=False)
-
-            if 'result' in res:
-                data = res['result']
-                if data[CONTACT_HAS_PHONE_ALIAS] == CONTACT_HAS_PHONE_TRUE:
-                    return data[CONTACT_PHONELIST_ALIAS][0]['VALUE']
-
-            return TextSnippets.FIELD_IS_EMPTY_PLACEHOLDER
-
-        except Exception as e:
-            return TextSnippets.FIELD_IS_EMPTY_PLACEHOLDER
+        user.clear_deal_photos()

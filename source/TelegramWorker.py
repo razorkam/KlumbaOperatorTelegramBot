@@ -10,22 +10,13 @@ import time
 class TgWorker:
     USERS = UserStore()
     MESSAGE_UPDATE_TYPE = 'message'
-    CBQ_UPDATE_TYPE = 'callback_query'
     # last update offset / incoming msg limit / long polling timeout / allowed messages types
-    GET_UPDATES_PARAMS = {'offset': 0, 'limit': 100, 'timeout': 30, 'allowed_updates': [MESSAGE_UPDATE_TYPE,
-                                                                                        CBQ_UPDATE_TYPE]}
+    GET_UPDATES_PARAMS = {'offset': 0, 'limit': 100, 'timeout': 30, 'allowed_updates': [MESSAGE_UPDATE_TYPE]}
     REQUESTS_TIMEOUT = 1.5 * GET_UPDATES_PARAMS['timeout']
     REQUESTS_MAX_ATTEMPTS = 5
     GLOBAL_LOOP_ERROR_TIMEOUT = 60  # seconds
     SESSION = requests.session()
     CommandsHandler = None
-
-    REQUEST_PHONE_PARAMS = {'text': TextSnippets.REQUEST_PHONE_NUMBER_MESSAGE,
-                            'reply_markup': {
-                                'keyboard': [[{'text': TextSnippets.REQUEST_PHONE_NUMBER_BUTTON,
-                                               'request_contact': True}]],
-                                'one_time_keyboard': True,
-                                'resize_keyboard': True}}
 
     def __init__(self):
         self.CommandsHandler = TelegramCommandsHandler(self)
@@ -53,39 +44,45 @@ class TgWorker:
 
         return {}
 
-    def send_message(self, chat_id, message_object, formatting='Markdown', disable_web_preview=True):
+    def send_file_dl_request(self, url):
+        for a in range(self.REQUESTS_MAX_ATTEMPTS):
+            try:
+                response = requests.get(url, proxies=creds.HTTPS_PROXY, timeout=self.REQUESTS_TIMEOUT)
+
+                if response:
+                    return response
+                else:
+                    logging.error('TG downloading file bad response attempt %s : URL: %s ', a, url)
+            except Exception as e:
+                logging.error('Downloading TG file %s', e)
+
+        return {}
+
+    def send_message(self, chat_id, message_object, formatting='Markdown'):
         message_object['chat_id'] = chat_id
         message_object['parse_mode'] = formatting
-        message_object['disable_web_page_preview'] = disable_web_preview
         return self.send_request('sendMessage', message_object, 'Message sending')
 
-    def edit_message(self, chat_id, message_id, message_object, formatting='Markdown', disable_web_preview=True):
-        message_object['chat_id'] = chat_id
-        message_object['message_id'] = message_id
-        message_object['parse_mode'] = formatting
-        message_object['disable_web_page_preview'] = disable_web_preview
-        return self.send_request('editMessageText', message_object, 'Message editing')
+    def get_user_file(self, user, file_id):
+        file = self.send_request('getFile', {'file_id': file_id})
+        file_path = None
+        file_extension = None
 
-    # edit current "working" message of user
-    def edit_user_wm(self, user, message_object, formatting='Markdown', from_callback=False):
-        res = self.edit_message(user.get_chat_id(), user.get_wm_id(), message_object, formatting)
+        try:
+            file_path = file['result']['file_path']
+        except Exception:
+            self.send_message(user.get_chat_id(), {'text': TextSnippets.FILE_LOADING_FAILED})
+            return None
 
-        if res or from_callback:
-            return res
+        result = self.send_file_dl_request(creds.FILE_DL_LINK.format(file_path))
 
-        res = self.send_message(user.get_chat_id(), message_object, formatting)
-        user.set_wm_id(res['result']['message_id'])
+        if not result:
+            self.send_message(user.get_chat_id(), {'text': TextSnippets.FILE_LOADING_FAILED})
+            return None
 
-    def delete_message(self, chat_id, message_id):
-        params = {'chat_id': chat_id, 'message_id': message_id}
-        return self.send_request('deleteMessage', params, 'Message deleting')
+        file_extension = file_path.split('.')[-1]
 
-    def answer_cbq(self, cbq_id, cbq_text=None, cbq_alert=False):
-        cbq_object = {'callback_query_id': cbq_id, 'show_alert': cbq_alert}
-        if cbq_text is not None:
-            cbq_object['text'] = cbq_text
-
-        return self.send_request('answerCallbackQuery', cbq_object, 'Answering cbq')
+        return result.content, file_extension
 
     def handle_user_command(self, message):
         try:
@@ -93,17 +90,9 @@ class TgWorker:
         except Exception as e:
             logging.error('Handling command: %s', e)
 
-    def handle_prauth_messages(self, user):
-        for m_id in user.get_prauth_messages():
-            self.delete_message(user.get_chat_id(), m_id)
-
-        user.clear_prauth_messages()
-
     def handle_message(self, message):
         user_id = message['from']['id']
         chat_id = message['chat']['id']
-        user = None
-        sent_prauth_msg_id = None
 
         # has user been already cached?-
         if self.USERS.has_user(user_id):
@@ -112,62 +101,31 @@ class TgWorker:
             if chat_id != user.get_chat_id():
                 user._chat_id = chat_id
 
-            if user.is_number_requested():
+            if user.is_authorized():
+                self.handle_user_command(message)
+            else:
                 try:
-                    contact = message['contact']
-                    phone_number = contact['phone_number']
-                    contact_user_id = contact['user_id']
+                    provided_password = message['text']
 
-                    if contact_user_id == user_id:
-                        self.USERS.authorize(user_id, phone_number)
+                    if provided_password == creds.GLOBAL_AUTH_PASSWORD:
+                        self.USERS.authorize(user_id, provided_password)
                     else:
-                        logging.error('Fake contact authorization attempt')
+                        logging.error('Invalid password authorization attempt, user: ' + user_id)
                         raise Exception()
                 except Exception:
-                    secondary_phone_params = self.REQUEST_PHONE_PARAMS.copy()
-                    secondary_phone_params['text'] = TextSnippets.AUTHORIZATION_UNSUCCESSFUL
-                    res = self.send_message(chat_id, secondary_phone_params)['result']
-                    sent_prauth_msg_id = res['message_id']
+                    self.send_message(chat_id, {'text': TextSnippets.AUTHORIZATION_UNSUCCESSFUL})
                 else:
-                    # remove phone requesting keyboard now
-                    res = self.send_message(chat_id, {'text': TextSnippets.AUTHORIZATION_SUCCESSFUL,
-                                                'reply_markup': {'remove_keyboard': True}})['result']
+                    self.send_message(chat_id, {'text': TextSnippets.AUTHORIZATION_SUCCESSFUL})
+                    self.send_message(chat_id, {'text': TextSnippets.BOT_HELP_TEXT})
 
-                    sent_prauth_msg_id = res['message_id']
-
-                    # res = self.send_message(chat_id, {'text': TextSnippets.BOT_HELP_TEXT})
-
-                    user.add_prauth_message(message['message_id'])
-                    user.add_prauth_message(sent_prauth_msg_id)
-
-                    self.handle_prauth_messages(user)
-                    res = self.CommandsHandler.get_deals_list(user)
-                    user.set_wm_id(res['result']['message_id'])
-                    return
-
-            elif user.is_authorized():
-                self.handle_user_command(message)
-                return # no pre-authorize messages
         else:
-            res = self.send_message(chat_id, self.REQUEST_PHONE_PARAMS)['result']
-            sent_prauth_msg_id = res['message_id']
-            user = self.USERS.add_user(user_id, User())
-
-        user.add_prauth_message(message['message_id'])
-        user.add_prauth_message(sent_prauth_msg_id)
-
-    def handle_cb_query(self, cb):
-        try:
-            self.CommandsHandler.handle_cb_query(cb)
-        except Exception as e:
-            logging.error('Handling cb query: %s', e)
+            self.send_message(chat_id, {'text': TextSnippets.REQUEST_PASS_MESSAGE})
+            self.USERS.add_user(user_id, User())
 
     def handle_update(self, update):
         try:
             if self.MESSAGE_UPDATE_TYPE in update:
                 self.handle_message(update[self.MESSAGE_UPDATE_TYPE])
-            elif self.CBQ_UPDATE_TYPE in update:
-                self.handle_cb_query(update[self.CBQ_UPDATE_TYPE])
             else:
                 raise Exception('Unknown update type: %s' % update)
         except Exception as e:

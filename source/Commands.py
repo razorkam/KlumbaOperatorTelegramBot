@@ -1,7 +1,2 @@
-GET_DEALS_LIST = '/get_my_deals'
 START = '/start'
-HELP = '/help'
-REAUTHORIZE = '/reauthorize'
-DEAL_OPEN_PREFIX = '/open'
-DEAL_CLOSE_PREFIX = '/c'
-DEAL_VIEW_PREFIX = '/v'
+CANCEL_PHOTO_LOADING = '/cancel'
