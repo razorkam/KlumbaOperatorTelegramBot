@@ -8,15 +8,13 @@ class UserState(Enum):
 
 
 class User:
-    _working_message_id = None
-
-    # storing encoded photos
-    photos_list = []
-
     def __init__(self):
         self._password = None
         self._state = UserState.PASSWORD_REQUESTED
         self._chat_id = None
+
+        # encoded photos
+        self.photos_list = []
 
     # pickle serializing fields
     def __getstate__(self):
@@ -24,6 +22,7 @@ class User:
 
     def __setstate__(self, dump):
         self._chat_id, self._state, self._password = dump
+        self.photos_list = []
 
     def is_pass_requested(self):
         return self._state == UserState.PASSWORD_REQUESTED

@@ -59,7 +59,6 @@ class BitrixWorker:
 
         if not deal:
             self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.NO_SUCH_DEAL.format(deal_id)})
-            user.clear_deal_photos()
             return
 
         photos_obj = {'id': deal_id, 'fields': {DEAL_SMALL_PHOTO_ALIAS: [], DEAL_BIG_PHOTO_ALIAS: []}}
