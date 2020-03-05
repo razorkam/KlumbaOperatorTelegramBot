@@ -1,4 +1,5 @@
 import base64
+import logging
 
 from .BitrixWorker import BitrixWorker
 from . import Utils, Commands
@@ -34,6 +35,8 @@ class TelegramCommandsHandler:
                                       unique_id_big + '.' + file_extension_big, encoded_data_small, encoded_data_big))
 
             self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.PHOTO_LOADED_TEXT})
+
+            logging.info('Chat id %s uploaded photo %s', user.get_chat_id(), unique_id_small)
 
     def handle_deal_update(self, user, deal_id):
         self.BitrixWorker.update_deal_image(user, deal_id)

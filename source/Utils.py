@@ -2,7 +2,7 @@ import re
 from . import Commands, TextSnippets
 
 MD_ESCAPE_PATTERN = re.compile('([*_`])')
-BITRIX_DEAL_NUMBER_PATTERN = re.compile('\\d+')
+BITRIX_DEAL_NUMBER_PATTERN = re.compile('^\\d+$')
 
 
 def get_field(obj, key):

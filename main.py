@@ -10,7 +10,8 @@ def main():
         log_handler = RotatingFileHandler('app.log', mode='a', maxBytes=LOG_MAX_SIZE,
                                           backupCount=5)
         log_handler.setFormatter(log_formatter)
-        log_handler.setLevel(logging.ERROR)
+        log_handler.setLevel(logging.INFO)
+        logging.getLogger().setLevel(logging.INFO)
         logging.basicConfig(handlers=[log_handler])
 
 

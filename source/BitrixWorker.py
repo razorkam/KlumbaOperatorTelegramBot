@@ -59,6 +59,7 @@ class BitrixWorker:
 
         if not deal:
             self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.NO_SUCH_DEAL.format(deal_id)})
+            user.clear_deal_photos()
             return
 
         photos_obj = {'id': deal_id, 'fields': {DEAL_SMALL_PHOTO_ALIAS: [], DEAL_BIG_PHOTO_ALIAS: []}}
@@ -69,6 +70,9 @@ class BitrixWorker:
 
             photos_obj['fields'][DEAL_BIG_PHOTO_ALIAS].append({'fileData': [photo.name_big,
                                                                             photo.encoded_data_big]})
+
+            logging.info('Chat id %s updating deal %s with photo ids %s:', user.get_chat_id(),
+                         deal_id, photo.name_small)
 
         result = self._send_request(user, 'crm.deal.update', photos_obj)
 

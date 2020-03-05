@@ -84,11 +84,12 @@ class TgWorker:
 
         return result.content, file_extension
 
-    def handle_user_command(self, message):
+    def handle_user_command(self, user, message):
         try:
             self.CommandsHandler.handle_command(message)
         except Exception as e:
             logging.error('Handling command: %s', e)
+            user.clear_deal_photos()
 
     def handle_message(self, message):
         user_id = message['from']['id']
@@ -102,7 +103,7 @@ class TgWorker:
                 user._chat_id = chat_id
 
             if user.is_authorized():
-                self.handle_user_command(message)
+                self.handle_user_command(user, message)
             else:
                 try:
                     provided_password = message['text']
@@ -132,10 +133,10 @@ class TgWorker:
             logging.error('Handling TG response update: %s', e)
 
     def base_response_handler(self, json_response):
-        # TODO: remove in production
-        # print(json_response)
-
         try:
+            if json_response['result']:
+                logging.info(json_response)
+
             max_update_id = self.GET_UPDATES_PARAMS['offset']
             updates = json_response['result']
             for update in updates:
