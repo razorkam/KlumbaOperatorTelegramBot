@@ -1,2 +1,6 @@
 START = '/start'
-CANCEL_PHOTO_LOADING = '/cancel'
+CANCEL = '/cancel'
+PHOTO_LOAD = '/photo'
+CHECKLIST_LOAD = '/checklist'
+SET_COURIER_PREFIX = '/c'
+SET_COURIER_DELIMETER = '_'

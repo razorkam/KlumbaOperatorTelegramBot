@@ -1,10 +1,18 @@
 from enum import Enum
 from . import creds
+from source.Checklist import *
 
 
 class UserState(Enum):
     PASSWORD_REQUESTED = 1
-    AUTHORIZED = 2
+    AUTHORIZED = 2  # user is in menu
+    # flowers photos
+    LOADING_PHOTOS = 3
+
+    # checklist loading actions
+    CHECKLIST_SETTING_DEAL_NUMBER = 4
+    CHECKLIST_SETTING_COURIER = 5
+    CHECKLIST_SETTING_PHOTO = 6
 
 
 class User:
@@ -12,9 +20,10 @@ class User:
         self._password = None
         self._state = UserState.PASSWORD_REQUESTED
         self._chat_id = None
-
-        # encoded photos
+        # encoded photos of 'photos' menu step
         self.photos_list = []
+        # description of 'checklist' menu step
+        self.checklist = Checklist()
 
     # pickle serializing fields
     def __getstate__(self):
@@ -23,12 +32,44 @@ class User:
     def __setstate__(self, dump):
         self._chat_id, self._state, self._password = dump
         self.photos_list = []
+        self.checklist = Checklist()
 
-    def is_pass_requested(self):
-        return self._state == UserState.PASSWORD_REQUESTED
+    def has_provided_password(self):
+        return self._state != UserState.PASSWORD_REQUESTED and self._password == creds.GLOBAL_AUTH_PASSWORD
 
-    def is_authorized(self):
-        return self._state == UserState.AUTHORIZED and self._password == creds.GLOBAL_AUTH_PASSWORD
+    def is_in_menu(self):
+        return self._state == UserState.AUTHORIZED
+
+    def set_state_menu(self):
+        self._state = UserState.AUTHORIZED
+
+    def is_photos_loading(self):
+        return self._state == UserState.LOADING_PHOTOS
+
+    def set_state_loading_photos(self):
+        self._state = UserState.LOADING_PHOTOS
+
+    def is_checklist_actions_handling(self):
+        return self._state in (UserState.CHECKLIST_SETTING_DEAL_NUMBER, UserState.CHECKLIST_SETTING_COURIER,
+                               UserState.CHECKLIST_SETTING_PHOTO)
+
+    def is_checklist_deal_number_setting(self):
+        return self._state == UserState.CHECKLIST_SETTING_DEAL_NUMBER
+
+    def is_checklist_courier_setting(self):
+        return self._state == UserState.CHECKLIST_SETTING_COURIER
+
+    def is_checklist_photo_setting(self):
+        return self._state == UserState.CHECKLIST_SETTING_PHOTO
+
+    def set_state_checklist_setting_deal_number(self):
+        self._state = UserState.CHECKLIST_SETTING_DEAL_NUMBER
+
+    def set_state_checklist_setting_courier(self):
+        self._state = UserState.CHECKLIST_SETTING_COURIER
+
+    def set_state_checklist_setting_photo(self):
+        self._state = UserState.CHECKLIST_SETTING_PHOTO
 
     def authorize(self, password):
         self._state = UserState.AUTHORIZED
@@ -53,3 +94,9 @@ class User:
 
     def clear_deal_photos(self):
         self.photos_list.clear()
+
+    def clear_checklist(self):
+        self.checklist = Checklist()
+
+    def get_state(self):
+        return self._state

@@ -3,6 +3,8 @@ from . import Commands, TextSnippets
 
 MD_ESCAPE_PATTERN = re.compile('([*_`])')
 BITRIX_DEAL_NUMBER_PATTERN = re.compile('^\\d+$')
+COURIER_SETTING_COMMAND_PATTERN = re.compile('^' + Commands.SET_COURIER_PREFIX +
+                                            Commands.SET_COURIER_DELIMETER + '\\d+$')
 
 
 def get_field(obj, key):
@@ -33,3 +35,7 @@ def prepare_external_field(obj, key):
 
 def is_deal_number(command):
     return BITRIX_DEAL_NUMBER_PATTERN.match(command)
+
+
+def is_courier_setting_command(command):
+    return COURIER_SETTING_COMMAND_PATTERN.match(command)

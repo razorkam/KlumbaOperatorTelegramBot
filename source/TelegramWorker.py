@@ -71,14 +71,16 @@ class TgWorker:
         try:
             file_path = file['result']['file_path']
         except Exception:
-            self.send_message(user.get_chat_id(), {'text': TextSnippets.FILE_LOADING_FAILED})
-            return None
+            self.send_message(user.get_chat_id(), {'text': TextSnippets.FILE_LOADING_FAILED + '\n' +
+                                                           TextSnippets.SUGGEST_CANCEL_TEXT})
+            return None, None
 
         result = self.send_file_dl_request(creds.FILE_DL_LINK.format(file_path))
 
         if not result:
-            self.send_message(user.get_chat_id(), {'text': TextSnippets.FILE_LOADING_FAILED})
-            return None
+            self.send_message(user.get_chat_id(), {'text': TextSnippets.FILE_LOADING_FAILED + '\n' +
+                                                           TextSnippets.SUGGEST_CANCEL_TEXT})
+            return None, None
 
         file_extension = file_path.split('.')[-1]
 
@@ -90,6 +92,10 @@ class TgWorker:
         except Exception as e:
             logging.error('Handling command: %s', e)
             user.clear_deal_photos()
+            user.clear_checklist()
+            user.set_state_menu()
+            self.send_message(message['chat']['id'], {'text': TextSnippets.UNKNOWN_ERROR + '\n'
+                                                              + TextSnippets.BOT_HELP_TEXT})
 
     def handle_message(self, message):
         user_id = message['from']['id']
@@ -102,7 +108,7 @@ class TgWorker:
             if chat_id != user.get_chat_id():
                 user._chat_id = chat_id
 
-            if user.is_authorized():
+            if user.has_provided_password():
                 self.handle_user_command(user, message)
             else:
                 try:

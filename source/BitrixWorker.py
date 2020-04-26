@@ -3,6 +3,10 @@ from . import creds
 import logging
 
 from .BitrixFieldsAliases import *
+from .BitrixFieldMappings import *
+from .MiscConstants import *
+
+from . import Utils
 from . import TextSnippets
 
 
@@ -52,30 +56,144 @@ class BitrixWorker:
         photos_list = user.get_deal_photos()
 
         if not photos_list:
-            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.NO_PHOTOS_TEXT})
-            return
+            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.NO_PHOTOS_TEXT + '\n'
+                                                                    + TextSnippets.SUGGEST_CANCEL_TEXT})
+            return False
 
         deal = self._send_request(user, 'crm.deal.get', {'id': deal_id}, notify_user=False)
 
-        if not deal:
-            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.NO_SUCH_DEAL.format(deal_id)})
-            return
+        if not deal or not deal['result']:
+            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.NO_SUCH_DEAL.format(deal_id) + '\n'
+                                                                    + TextSnippets.SUGGEST_CANCEL_TEXT})
+            return False
 
-        photos_obj = {'id': deal_id, 'fields': {DEAL_SMALL_PHOTO_ALIAS: [], DEAL_BIG_PHOTO_ALIAS: []}}
+        update_obj = {'id': deal_id, 'fields': {DEAL_SMALL_PHOTO_ALIAS: [], DEAL_BIG_PHOTO_ALIAS: [],
+                                                DEAL_STAGE_ALIAS: DEAL_IS_EQUIPPED_STAGE}}
+
+        is_takeaway = deal['result'][DEAL_SUPPLY_METHOD_ALIAS] == DEAL_IS_FOR_TAKEAWAY
 
         for photo in photos_list:
-            photos_obj['fields'][DEAL_SMALL_PHOTO_ALIAS].append({'fileData': [photo.name_small,
+            update_obj['fields'][DEAL_SMALL_PHOTO_ALIAS].append({'fileData': [photo.name_small,
                                                                               photo.encoded_data_small]})
 
-            photos_obj['fields'][DEAL_BIG_PHOTO_ALIAS].append({'fileData': [photo.name_big,
+            update_obj['fields'][DEAL_BIG_PHOTO_ALIAS].append({'fileData': [photo.name_big,
                                                                             photo.encoded_data_big]})
 
             logging.info('Chat id %s updating deal %s with photo ids %s:', user.get_chat_id(),
                          deal_id, photo.name_small)
 
-        result = self._send_request(user, 'crm.deal.update', photos_obj)
+        # load fake photo to checklist in case of takeaway deal
+        if is_takeaway:
+            fake_photo = photos_list[0]
+            update_obj['fields'][DEAL_CHECKLIST_ALIAS] = {'fileData': [fake_photo.name_small,
+                                                                       fake_photo.encoded_data_small]}
+
+        result = self._send_request(user, 'crm.deal.update', update_obj)
 
         if result['result']:
             self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.DEAL_UPDATED_TEXT})
+        else:
+            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.ERROR_BITRIX_REQUEST + '\n'
+                                                                    + TextSnippets.SUGGEST_CANCEL_TEXT})
+            return False
 
         user.clear_deal_photos()
+        return True
+
+    def process_checklist_deal_info(self, deal_id, user):
+        deal = self._send_request(user, 'crm.deal.get', {'id': deal_id}, notify_user=False)
+
+        if not deal or not deal['result']:
+            return False
+
+        data = deal['result']
+
+        user.checklist.deal_id = deal_id
+        user.checklist.order = Utils.prepare_external_field(data, DEAL_ORDER_ALIAS)
+
+        contact_data = {}
+
+        try:
+            contact_id = data[DEAL_CONTACT_ALIAS]
+            contact_data = self._send_request(user, 'crm.contact.get',
+                                              {'id': contact_id}, notify_user=False)
+
+            if 'result' in contact_data:
+                contact_data = contact_data['result']
+            else:
+                contact_data = {}
+
+        except Exception as e:
+            logging.error("Exception getting contact data, %s", e)
+
+        contact_name = Utils.prepare_external_field(contact_data, CONTACT_USER_NAME_ALIAS)
+        contact_phone = ''
+
+        if contact_data[CONTACT_HAS_PHONE_ALIAS] == CONTACT_HAS_PHONE:
+            contact_phone = Utils.prepare_external_field(contact_data[CONTACT_PHONE_ALIAS][0], 'VALUE')
+
+        user.checklist.contact = contact_name + ' ' + contact_phone
+        user.checklist.florist = Utils.prepare_external_field(data, DEAL_FLORIST_ALIAS)
+        user.checklist.order_received_by = Utils.prepare_external_field(data, DEAL_ORDER_RECEIVED_BY_ALIAS)
+        user.checklist.total_sum = Utils.prepare_external_field(data, DEAL_TOTAL_SUM_ALIAS)
+
+        payment_type_id = Utils.prepare_external_field(data, DEAL_PAYMENT_TYPE_ALIAS)
+        payment_types_dict = {}
+
+        try:
+            payment_type_field = self._send_request(user, 'crm.deal.userfield.get', {'id': PAYMENT_TYPE_FIELD_ID})
+            payment_types = payment_type_field['result']['LIST']
+            payment_types_dict = {pt['ID']: pt['VALUE'] for pt in payment_types}
+        except Exception as e:
+            logging.error("Exception getting payment types data, %s", e)
+
+        user.checklist.payment_type = Utils.prepare_external_field(payment_types_dict, payment_type_id)
+
+        payment_method_id = Utils.prepare_external_field(data, DEAL_PAYMENT_METHOD_ALIAS)
+        payment_methods_dict = {}
+
+        try:
+            payment_method_field = self._send_request(user, 'crm.deal.userfield.get', {'id': PAYMENT_METHOD_FIELD_ID})
+            payment_methods = payment_method_field['result']['LIST']
+            payment_methods_dict = {pt['ID']: pt['VALUE'] for pt in payment_methods}
+        except Exception as e:
+            logging.error("Exception getting payment methods data, %s", e)
+
+        user.checklist.payment_method = Utils.prepare_external_field(payment_methods_dict, payment_method_id)
+
+        user.checklist.payment_status = Utils.prepare_external_field(data, DEAL_PAYMENT_STATUS_ALIAS)
+        user.checklist.prepaid = Utils.prepare_external_field(data, DEAL_PREPAID_ALIAS)
+        user.checklist.to_pay = Utils.prepare_external_field(data, DEAL_TO_PAY_ALIAS)
+
+        return True
+
+    def get_couriers_list(self, user):
+        couriers = []
+
+        try:
+            courier_field = self._send_request(user, 'crm.deal.userfield.get', {'id': COURIER_FIELD_ID})
+            couriers = courier_field['result']['LIST']
+        except Exception as e:
+            logging.error("Exception getting couriers data, %s", e)
+
+        return {c['ID']: (' ' + COURIER_FIELD_DELIMETER + ' ')
+            .join(Utils.prepare_external_field(c, 'VALUE').split(COURIER_FIELD_DELIMETER)) for c in couriers}
+
+    def update_deal_checklist(self, user):
+        update_obj = {'id': user.checklist.deal_id,
+                      'fields': {DEAL_CHECKLIST_ALIAS: {'fileData': [user.checklist.photo_name,
+                                                                     user.checklist.photo_data]},
+                                 DEAL_STAGE_ALIAS: DEAL_IS_IN_DELIVERY_STAGE,
+                                 DEAL_COURIER_ALIAS: user.checklist.courier_id}}
+
+        result = self._send_request(user, 'crm.deal.update', update_obj)
+
+        if result['result']:
+            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.DEAL_UPDATED_TEXT})
+        else:
+            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.ERROR_BITRIX_REQUEST + '\n'
+                                                                    + TextSnippets.SUGGEST_CANCEL_TEXT})
+            return False
+
+        user.clear_checklist()
+        return True
