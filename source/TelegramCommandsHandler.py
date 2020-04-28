@@ -56,10 +56,12 @@ class TelegramCommandsHandler:
                 self.TgWorker.send_message(chat_id, {'text': TextSnippets.BOT_HELP_TEXT})
             elif cmd == Commands.PHOTO_LOAD:
                 user.set_state_loading_photos()
+                user.clear_deal_photos()
                 self.TgWorker.send_message(chat_id, {'text': TextSnippets.ASK_FOR_PHOTO_TEXT})
 
             elif cmd == Commands.CHECKLIST_LOAD:
                 user.set_state_checklist_setting_deal_number()
+                user.clear_checklist()
                 self.TgWorker.send_message(chat_id, {'text': TextSnippets.ASK_FOR_DEAL_NUMBER_TEXT})
             else:
                 self.TgWorker.send_message(chat_id, {'text': TextSnippets.UNKNOWN_COMMAND + '\n'
@@ -112,11 +114,9 @@ class TelegramCommandsHandler:
             command = message['text']
 
             if Utils.is_deal_number(command):
-                deal_existing = self.BitrixWorker.process_checklist_deal_info(command, user)
+                result = self.BitrixWorker.process_checklist_deal_info(command, user)
 
-                if not deal_existing:
-                    self.TgWorker.send_message(chat_id, {'text': TextSnippets.NO_SUCH_DEAL.format(command) + '\n'
-                                                                 + TextSnippets.SUGGEST_CANCEL_TEXT})
+                if not result:
                     return
 
                 user.set_state_checklist_setting_courier()

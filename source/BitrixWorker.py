@@ -67,6 +67,11 @@ class BitrixWorker:
                                                                     + TextSnippets.SUGGEST_CANCEL_TEXT})
             return False
 
+        if deal['result'][DEAL_STAGE_ALIAS] != DEAL_IS_IN_1C_STAGE:
+            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.PHOTO_LOAD_WRONG_DEAL_STAGE + '\n'
+                                                                    + TextSnippets.SUGGEST_CANCEL_TEXT})
+            return False
+
         update_obj = {'id': deal_id, 'fields': {DEAL_SMALL_PHOTO_ALIAS: [], DEAL_BIG_PHOTO_ALIAS: [],
                                                 DEAL_STAGE_ALIAS: DEAL_IS_EQUIPPED_STAGE}}
 
@@ -104,9 +109,16 @@ class BitrixWorker:
         deal = self._send_request(user, 'crm.deal.get', {'id': deal_id}, notify_user=False)
 
         if not deal or not deal['result']:
+            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.NO_SUCH_DEAL.format(deal_id) + '\n'
+                                                             + TextSnippets.SUGGEST_CANCEL_TEXT})
             return False
 
         data = deal['result']
+
+        if data[DEAL_STAGE_ALIAS] != DEAL_IS_EQUIPPED_STAGE:
+            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.CHECKLIST_LOAD_WRONG_DEAL_STAGE + '\n'
+                                                                    + TextSnippets.SUGGEST_CANCEL_TEXT})
+            return False
 
         user.checklist.deal_id = deal_id
         user.checklist.order = Utils.prepare_external_field(data, DEAL_ORDER_ALIAS)
