@@ -15,7 +15,7 @@ class TgWorker:
     REQUESTS_TIMEOUT = 1.5 * GET_UPDATES_PARAMS['timeout']
     REQUESTS_MAX_ATTEMPTS = 5
     GLOBAL_LOOP_ERROR_TIMEOUT = 60  # seconds
-    PROXIES = [creds.HTTPS_PROXY_GERMANY, creds.HTTPS_PROXY_FINLAND]
+    PROXIES = [creds.HTTPS_PROXY_1, creds.HTTPS_PROXY_2]
     SESSION = requests.session()
     CommandsHandler = None
 
@@ -61,7 +61,7 @@ class TgWorker:
 
         for a in range(self.REQUESTS_MAX_ATTEMPTS):
             try:
-                response = requests.get(url, proxies=creds.HTTPS_PROXY_GERMANY, timeout=self.REQUESTS_TIMEOUT)
+                response = self.SESSION.get(url, proxies=self.PROXIES[proxy_index], timeout=self.REQUESTS_TIMEOUT)
 
                 if response:
                     return response
