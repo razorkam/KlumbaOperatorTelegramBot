@@ -92,6 +92,9 @@ class User:
     def get_deal_photos(self):
         return self.photos_list
 
+    def get_deal_encoded_photos(self):
+        return [p.b64_encode() for p in self.photos_list]
+
     def clear_deal_photos(self):
         self.photos_list.clear()
 

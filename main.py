@@ -1,6 +1,7 @@
 import logging
 from logging.handlers import RotatingFileHandler
 from source.TelegramWorker import TgWorker
+from source.StorageWorker import StorageWorker
 
 LOG_MAX_SIZE = 2 * 1024 * 1024 # 2 mbytes
 
@@ -14,6 +15,7 @@ def main():
         logging.getLogger().setLevel(logging.INFO)
         logging.basicConfig(handlers=[log_handler])
 
+        StorageWorker.maintain_storage()
 
         tg_worker = TgWorker()
         tg_worker.run()

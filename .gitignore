@@ -3,3 +3,4 @@ __pycache__/
 source/creds.py
 *.log
 *.pickle
+orders_data/*

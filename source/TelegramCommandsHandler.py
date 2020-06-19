@@ -1,7 +1,8 @@
-import base64
 import logging
+import base64
 
 from .BitrixWorker import BitrixWorker
+from .StorageWorker import *
 from . import Utils, Commands
 from . import TextSnippets
 from .Photo import Photo
@@ -28,18 +29,25 @@ class TelegramCommandsHandler:
         unique_id_small = photo_small['file_unique_id']
 
         if photo_content_big and photo_content_small:
-            encoded_data_big = base64.b64encode(photo_content_big).decode('ascii')
-            encoded_data_small = base64.b64encode(photo_content_small).decode('ascii')
 
-            user.add_deal_photo(Photo(unique_id_small + '.' + file_extension_small,
-                                      unique_id_big + '.' + file_extension_big, encoded_data_small, encoded_data_big))
+            # store raw photo data to save it on disk later
+            user.add_deal_photo(Photo(unique_id_small + '_S' '.' + file_extension_small,
+                                      unique_id_big + '_B' + '.' + file_extension_big,
+                                      photo_content_small,
+                                      photo_content_big))
 
             self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.PHOTO_LOADED_TEXT})
 
             logging.info('Chat id %s uploaded photo %s', user.get_chat_id(), unique_id_small)
 
     def deal_photos_update(self, user, deal_id):
-        return self.BitrixWorker.update_deal_image(user, deal_id)
+        digest = StorageWorker.save_order(user, deal_id)
+
+        if not digest:
+            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.UNKNOWN_ERROR})
+            return False
+
+        return self.BitrixWorker.update_deal_image(user, deal_id, digest)
 
     def handle_photo_getting_cancel(self, user):
         user.clear_deal_photos()

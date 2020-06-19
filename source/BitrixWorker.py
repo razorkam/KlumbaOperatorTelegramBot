@@ -52,8 +52,8 @@ class BitrixWorker:
 
         return None
 
-    def update_deal_image(self, user, deal_id):
-        photos_list = user.get_deal_photos()
+    def update_deal_image(self, user, deal_id, digest):
+        photos_list = user.get_deal_encoded_photos()
 
         if not photos_list:
             self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.NO_PHOTOS_TEXT + '\n'
@@ -73,16 +73,17 @@ class BitrixWorker:
             return False
 
         update_obj = {'id': deal_id, 'fields': {DEAL_SMALL_PHOTO_ALIAS: [], DEAL_BIG_PHOTO_ALIAS: [],
-                                                DEAL_STAGE_ALIAS: DEAL_IS_EQUIPPED_STAGE}}
+                                                DEAL_STAGE_ALIAS: DEAL_IS_EQUIPPED_STAGE,
+                                                DEAL_CLIENT_URL_ALIAS: digest}}
 
         is_takeaway = deal['result'][DEAL_SUPPLY_METHOD_ALIAS] == DEAL_IS_FOR_TAKEAWAY
 
         for photo in photos_list:
             update_obj['fields'][DEAL_SMALL_PHOTO_ALIAS].append({'fileData': [photo.name_small,
-                                                                              photo.encoded_data_small]})
+                                                                              photo.data_small]})
 
             update_obj['fields'][DEAL_BIG_PHOTO_ALIAS].append({'fileData': [photo.name_big,
-                                                                            photo.encoded_data_big]})
+                                                                            photo.data_big]})
 
             logging.info('Chat id %s updating deal %s with photo ids %s:', user.get_chat_id(),
                          deal_id, photo.name_small)
@@ -91,7 +92,7 @@ class BitrixWorker:
         if is_takeaway:
             fake_photo = photos_list[0]
             update_obj['fields'][DEAL_CHECKLIST_ALIAS] = {'fileData': [fake_photo.name_small,
-                                                                       fake_photo.encoded_data_small]}
+                                                                       fake_photo.data_small]}
 
         result = self._send_request(user, 'crm.deal.update', update_obj)
 
