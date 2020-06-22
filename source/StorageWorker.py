@@ -106,3 +106,31 @@ class StorageWorker:
 
         thread = Thread(target=thread_fun, daemon=True)
         thread.start()
+
+    @staticmethod
+    def get_deal_id(digest):
+        try:
+            conn = sqlite3.connect(os.path.join(StorageWorker.ORDERS_DIR, StorageWorker.DATABASE_NAME))
+            cursor = conn.cursor()
+            cursor.execute('select * from orders where digest=?', (digest,))
+            data = cursor.fetchall()
+
+            if len(data) == 0:
+                return None
+            else:
+                return data[0][1]
+        except Exception as e:
+            logging.error('Error getting deal id by digest: %s', e)
+            return None
+
+    @staticmethod
+    def get_deal_photos_path(digest):
+        photos_path_list = []
+
+        try:
+            for photo_entry in os.scandir(os.path.join(StorageWorker.ORDERS_DIR, digest)):
+                photos_path_list.append('/' + digest + '/' + photo_entry.name)
+
+        except Exception as e:
+            logging.error('Error traversing deal photos to return: %s', e)
+            return []

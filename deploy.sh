@@ -2,6 +2,7 @@
 
 pip3 install filelock
 pip3 install schedule
+pip3 install flask
 
 systemctl stop klumba_operator_bot
 rm -f  /etc/systemd/system/klumba_operator_bot.service

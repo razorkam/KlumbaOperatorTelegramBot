@@ -5,6 +5,7 @@ import logging
 from .BitrixFieldsAliases import *
 from .BitrixFieldMappings import *
 from .MiscConstants import *
+from .ClientDealDesc import ClientDealDesc
 
 from . import Utils
 from . import TextSnippets
@@ -210,3 +211,50 @@ class BitrixWorker:
 
         user.clear_checklist()
         return True
+
+    def get_deal_info_for_client(self, deal_id):
+        try:
+            deal = self._send_request(None, 'crm.deal.get', {'id': deal_id}, notify_user=False)
+
+            if not deal or not deal['result']:
+                logging.error('Cant get deal info for deal %s', deal_id)
+                return False
+
+            data = deal['result']
+            deal_desc = ClientDealDesc()
+
+            address, location = Utils.prepare_deal_address(data, DEAL_ADDRESS_ALIAS)
+            deal_desc.address = address
+
+            contact_data = {}
+
+            try:
+                contact_id = data[DEAL_CONTACT_ALIAS]
+                contact_data = self._send_request(None, 'crm.contact.get',
+                                                  {'id': contact_id}, notify_user=False)
+
+                if 'result' in contact_data:
+                    contact_data = contact_data['result']
+                else:
+                    contact_data = {}
+
+            except Exception as e:
+                logging.error("Exception getting contact data, %s", e)
+
+            contact_phone = ''
+
+            if contact_data[CONTACT_HAS_PHONE_ALIAS] == CONTACT_HAS_PHONE:
+                contact_phone = Utils.prepare_external_field(contact_data[CONTACT_PHONE_ALIAS][0], 'VALUE')
+
+            deal_desc.phone = contact_phone
+            deal_desc.date = Utils.prepare_deal_date(data, DEAL_DATE_ALIAS)
+            deal_desc.time = Utils.prepare_deal_time(data, DEAL_TIME_ALIAS)
+            deal_desc.sum = Utils.prepare_external_field(data, DEAL_SUM_ALIAS)
+
+        except Exception as e:
+            logging.error('Error getting client deal info: %s', e)
+            return None
+
+        return deal_desc
+
+
