@@ -134,3 +134,5 @@ class StorageWorker:
         except Exception as e:
             logging.error('Error traversing deal photos to return: %s', e)
             return []
+
+        return photos_path_list

@@ -257,4 +257,29 @@ class BitrixWorker:
 
         return deal_desc
 
+    def update_deal_by_client(self, deal_id, data):
+        try:
+            comment = Utils.get_field(data, REQUEST_COMMENT_ALIAS)
+            approved = Utils.get_field(data, REQUEST_APPROVED_ALIAS)
+            call_me_back = Utils.get_field(data, REQUEST_CALLMEBACK_ALIAS)
 
+            update_obj = {
+                'id': deal_id,
+                'fields': {
+                    DEAL_CLIENT_COMMENT_ALIAS: comment,
+                    DEAL_CLIENT_APPROVED_ALIAS: approved,
+                    DEAL_CLIENT_CALLMEBACK_ALIAS: call_me_back
+                }
+            }
+
+            result = self._send_request(None, 'crm.deal.update', update_obj)
+
+            if result['result']:
+                return True
+            else:
+                logging.error('Error updating client deal info: %s', result)
+                return False
+
+        except Exception as e:
+            logging.error('Error updating client deal info: %s', e)
+            return False
