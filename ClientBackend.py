@@ -31,12 +31,12 @@ def get_deal_info(digest):
         deal_id = StorageWorker.get_deal_id(digest)
 
         if not deal_id:
-            return Response('Order not found', status=404)
+            return Response('Заказ не найден', status=404)
 
         deal_desc = bw.get_deal_info_for_client(deal_id)
 
         if not deal_desc:
-            return Response("Can't get deal data", status=503)
+            return Response("Ошибка при получении данных заказа", status=503)
 
         deal_desc.photos = StorageWorker.get_deal_photos_path(digest)
         rsp = deal_desc.get_dict()
@@ -45,7 +45,7 @@ def get_deal_info(digest):
         return jsonify(rsp)
     except Exception as e:
         logging.error('Get deal request error: %s', e)
-        return Response('Internal server error', status=500)
+        return Response('Внутренняя ошибка сервера', status=500)
 
 
 @app.route('/<string:digest>', methods=['POST'])
@@ -54,23 +54,25 @@ def update_deal(digest):
         deal_id = StorageWorker.get_deal_id(digest)
 
         if not deal_id:
-            return Response('Order not found', status=404)
+            return Response('Заказ не найден', status=404)
 
         data = None
         if request.is_json:
             data = request.json
             pass
         else:
-            return Response('Request should be in json form', status=400)
+            return Response('Данные клиента должны быть переданы в виде json', status=400)
 
         result = bw.update_deal_by_client(deal_id, data)
 
         if not result:
-            return Response('Error updating deal', status=500)
+            return Response('Внутрення ошибка при обновлении заказа', status=500)
+
+        return Response('Заказ успешно обновлен!', status=200)
 
     except Exception as e:
         logging.error('Update deal request error: %s', e)
-        return Response('Internal server error', status=500)
+        return Response('Внутренняя ошибка сервера', status=500)
 
 
 if __name__ == '__main__':
