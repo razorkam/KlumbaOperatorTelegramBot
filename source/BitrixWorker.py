@@ -10,6 +10,8 @@ from .ClientDealDesc import ClientDealDesc
 from . import Utils
 from . import TextSnippets
 
+DEAL_ALREADY_APPROVED = 1
+
 
 class BitrixWorker:
     SESSION = requests.session()
@@ -117,7 +119,7 @@ class BitrixWorker:
 
         data = deal['result']
 
-        if data[DEAL_STAGE_ALIAS] != DEAL_IS_EQUIPPED_STAGE:
+        if data[DEAL_STAGE_ALIAS] != DEAL_IS_IN_APPROVED_STAGE:
             self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.CHECKLIST_LOAD_WRONG_DEAL_STAGE + '\n'
                                                                     + TextSnippets.SUGGEST_CANCEL_TEXT})
             return False
@@ -221,6 +223,11 @@ class BitrixWorker:
                 return False
 
             data = deal['result']
+            stage = data[DEAL_STAGE_ALIAS]
+
+            if stage != DEAL_IS_EQUIPPED_STAGE:
+                return None
+
             deal_desc = ClientDealDesc()
 
             address, location = Utils.prepare_deal_address(data, DEAL_ADDRESS_ALIAS)
@@ -249,13 +256,32 @@ class BitrixWorker:
             deal_desc.phone = contact_phone
             deal_desc.date = Utils.prepare_deal_date(data, DEAL_DATE_ALIAS)
             deal_desc.time = Utils.prepare_deal_time(data, DEAL_TIME_ALIAS)
-            deal_desc.sum = Utils.prepare_external_field(data, DEAL_SUM_ALIAS)
+            deal_desc.sum = Utils.prepare_external_field(data, DEAL_TOTAL_SUM_ALIAS)
 
         except Exception as e:
             logging.error('Error getting client deal info: %s', e)
-            return None
+            return False
 
         return deal_desc
+
+    def check_deal_stage_before_update(self, deal_id):
+        try:
+            deal = self._send_request(None, 'crm.deal.get', {'id': deal_id}, notify_user=False)
+
+            if not deal or not deal['result']:
+                logging.error('Cant get deal info for deal %s', deal_id)
+                return None
+
+            data = deal['result']
+            stage = data[DEAL_STAGE_ALIAS]
+
+            return stage == DEAL_IS_EQUIPPED_STAGE
+
+        except Exception as e:
+            logging.error("Exception getting contact data, %s", e)
+            return None
+
+
 
     def update_deal_by_client(self, deal_id, data):
         try:
@@ -267,7 +293,7 @@ class BitrixWorker:
                 'id': deal_id,
                 'fields': {
                     DEAL_CLIENT_COMMENT_ALIAS: comment,
-                    DEAL_CLIENT_APPROVED_ALIAS: approved,
+                    DEAL_STAGE_ALIAS: DEAL_IS_IN_APPROVED_STAGE if approved else DEAL_IS_IN_UNAPPROVED_STAGE,
                     DEAL_CLIENT_CALLMEBACK_ALIAS: call_me_back
                 }
             }

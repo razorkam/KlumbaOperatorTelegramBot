@@ -5,7 +5,7 @@ from source.BitrixWorker import *
 import logging
 from logging.handlers import RotatingFileHandler
 
-LOG_MAX_SIZE = 2 * 1024 * 1024 # 2 mbytes
+LOG_MAX_SIZE = 2 * 1024 * 1024  # 2 mbytes
 
 app = Flask(__name__)
 bw = BitrixWorker(None)
@@ -19,6 +19,7 @@ log_handler.setFormatter(log_formatter)
 log_handler.setLevel(logging.INFO)
 logging.getLogger().setLevel(logging.INFO)
 logging.basicConfig(handlers=[log_handler])
+
 
 @app.route('/')
 def hello():
@@ -35,8 +36,11 @@ def get_deal_info(digest):
 
         deal_desc = bw.get_deal_info_for_client(deal_id)
 
-        if not deal_desc:
+        if deal_desc is False:
             return Response("Ошибка при получении данных заказа", status=503)
+
+        if deal_desc is None:
+            return Response('Заказ уже был согласован', status=501)
 
         deal_desc.photos = StorageWorker.get_deal_photos_path(digest)
         rsp = deal_desc.get_dict()
@@ -56,6 +60,14 @@ def update_deal(digest):
         if not deal_id:
             return Response('Заказ не найден', status=404)
 
+        stage_check_result = bw.check_deal_stage_before_update(deal_id)
+
+        if stage_check_result is None:
+            return Response('Внутренняя ошибка при обновлении заказа', status=503)
+
+        if not stage_check_result:
+            return Response('Заказ уже был согласован', status=501)
+
         data = None
         if request.is_json:
             data = request.json
@@ -66,7 +78,7 @@ def update_deal(digest):
         result = bw.update_deal_by_client(deal_id, data)
 
         if not result:
-            return Response('Внутрення ошибка при обновлении заказа', status=500)
+            return Response('Внутренняя ошибка при обновлении заказа', status=503)
 
         return Response('Заказ успешно обновлен!', status=200)
 

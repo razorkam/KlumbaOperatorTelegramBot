@@ -15,7 +15,7 @@ random.seed()
 
 class StorageWorker:
     ORDERS_DIR = os.path.join(os.getcwd(), 'orders_data')
-    ORDER_DIGEST_LIMIT = 16
+    ORDER_DIGEST_LIMIT = 8
     DATABASE_NAME = 'orders.db'
     CONN = sqlite3.connect(os.path.join(ORDERS_DIR, DATABASE_NAME))
     ORDER_EXPIRED_TIME_LIMIT = 24 * 60 * 60  # seconds to order expiration
