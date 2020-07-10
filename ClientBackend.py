@@ -29,6 +29,8 @@ def hello():
 @app.route('/<string:digest>', methods=['GET'])
 def get_deal_info(digest):
     try:
+        logging.info('New get deal info request: %s', digest)
+
         deal_id = StorageWorker.get_deal_id(digest)
 
         if not deal_id:
@@ -55,6 +57,8 @@ def get_deal_info(digest):
 @app.route('/<string:digest>', methods=['POST'])
 def update_deal(digest):
     try:
+        logging.info('New update deal info request: %s', digest)
+
         deal_id = StorageWorker.get_deal_id(digest)
 
         if not deal_id:
@@ -74,6 +78,8 @@ def update_deal(digest):
             pass
         else:
             return Response('Данные клиента должны быть переданы в виде json', status=400)
+
+        logging.info('Request body json data: %s', data)
 
         result = bw.update_deal_by_client(deal_id, data)
 

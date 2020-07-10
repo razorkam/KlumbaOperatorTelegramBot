@@ -70,7 +70,8 @@ class BitrixWorker:
                                                                     + TextSnippets.SUGGEST_CANCEL_TEXT})
             return False
 
-        if deal['result'][DEAL_STAGE_ALIAS] != DEAL_IS_IN_1C_STAGE:
+        if deal['result'][DEAL_STAGE_ALIAS] != DEAL_IS_IN_1C_STAGE and\
+                deal['result'][DEAL_STAGE_ALIAS] != DEAL_IS_IN_UNAPPROVED_STAGE:
             self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.PHOTO_LOAD_WRONG_DEAL_STAGE + '\n'
                                                                     + TextSnippets.SUGGEST_CANCEL_TEXT})
             return False
@@ -294,7 +295,8 @@ class BitrixWorker:
                 'fields': {
                     DEAL_CLIENT_COMMENT_ALIAS: comment,
                     DEAL_STAGE_ALIAS: DEAL_IS_IN_APPROVED_STAGE if approved else DEAL_IS_IN_UNAPPROVED_STAGE,
-                    DEAL_CLIENT_CALLMEBACK_ALIAS: call_me_back
+                    DEAL_CLIENT_CALLMEBACK_ALIAS: call_me_back,
+                    DEAL_COMMENT_APPROVED_ALIAS: TextSnippets.DEAL_COMMENT_APPROVED_STUB if approved else None
                 }
             }
 
