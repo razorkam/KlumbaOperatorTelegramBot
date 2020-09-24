@@ -28,3 +28,9 @@ DEAL_TIME_MAPPING = {
    '1685': "20:00 - 00:00",
    '1701': "08:00 - 22:00",
 }
+
+
+DEAL_INCOGNITO_MAPPING = {
+   '0': False,
+   '1': True
+}

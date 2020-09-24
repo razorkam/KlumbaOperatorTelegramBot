@@ -78,3 +78,11 @@ def prepare_deal_time(obj, timekey):
     else:
         return TextSnippets.FIELD_IS_EMPTY_PLACEHOLDER
 
+
+def prepare_deal_incognito(obj, inckey):
+    val = prepare_external_field(obj, inckey)
+
+    if val in BitrixFieldMappings.DEAL_INCOGNITO_MAPPING:
+        return BitrixFieldMappings.DEAL_INCOGNITO_MAPPING[val]
+    else:
+        return TextSnippets.FIELD_IS_EMPTY_PLACEHOLDER

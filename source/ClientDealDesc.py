@@ -1,17 +1,19 @@
 
 class ClientDealDesc:
     address = None
-    phone = None
     date = None
     time = None
     sum = None
+    to_pay = None
+    incognito = None
     photos = []
 
     def get_dict(self):
         return {
             'address': self.address,
-            'phone': self.phone,
             'date': self.date,
+            'to_pay': self.to_pay,
+            'incognito': self.incognito,
             'time': self.time,
             'sum': self.sum,
             'photos': self.photos

@@ -234,30 +234,13 @@ class BitrixWorker:
             address, location = Utils.prepare_deal_address(data, DEAL_ADDRESS_ALIAS)
             deal_desc.address = address
 
-            contact_data = {}
-
-            try:
-                contact_id = data[DEAL_CONTACT_ALIAS]
-                contact_data = self._send_request(None, 'crm.contact.get',
-                                                  {'id': contact_id}, notify_user=False)
-
-                if 'result' in contact_data:
-                    contact_data = contact_data['result']
-                else:
-                    contact_data = {}
-
-            except Exception as e:
-                logging.error("Exception getting contact data, %s", e)
-
-            contact_phone = ''
-
-            if contact_data[CONTACT_HAS_PHONE_ALIAS] == CONTACT_HAS_PHONE:
-                contact_phone = Utils.prepare_external_field(contact_data[CONTACT_PHONE_ALIAS][0], 'VALUE')
-
-            deal_desc.phone = contact_phone
             deal_desc.date = Utils.prepare_deal_date(data, DEAL_DATE_ALIAS)
             deal_desc.time = Utils.prepare_deal_time(data, DEAL_TIME_ALIAS)
             deal_desc.sum = Utils.prepare_external_field(data, DEAL_TOTAL_SUM_ALIAS)
+            deal_desc.to_pay = Utils.prepare_external_field(data, DEAL_SUM_ALIAS)
+
+            incognito = Utils.prepare_deal_incognito(data, DEAL_INCOGNITO_ALIAS)
+            deal_desc.incognito = True if incognito else False
 
         except Exception as e:
             logging.error('Error getting client deal info: %s', e)
