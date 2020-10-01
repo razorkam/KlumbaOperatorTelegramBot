@@ -18,4 +18,7 @@ class Checklist:
         self.payment_status = None
         self.prepaid = None
         self.to_pay = None
+        self.incognito = None
+        self.order_comment = None
+        self.delivery_comment = None
 

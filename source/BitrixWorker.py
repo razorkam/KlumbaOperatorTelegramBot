@@ -181,6 +181,9 @@ class BitrixWorker:
         user.checklist.payment_status = Utils.prepare_external_field(data, DEAL_PAYMENT_STATUS_ALIAS)
         user.checklist.prepaid = Utils.prepare_external_field(data, DEAL_PREPAID_ALIAS)
         user.checklist.to_pay = Utils.prepare_external_field(data, DEAL_TO_PAY_ALIAS)
+        user.checklist.incognito = Utils.prepare_deal_incognito_operator(data, DEAL_INCOGNITO_ALIAS)
+        user.checklist.order_comment = Utils.prepare_external_field(data, DEAL_ORDER_COMMENT_ALIAS)
+        user.checklist.delivery_comment = Utils.prepare_external_field(data, DEAL_DELIVERY_COMMENT_ALIAS)
 
         return True
 
@@ -239,8 +242,7 @@ class BitrixWorker:
             deal_desc.sum = Utils.prepare_external_field(data, DEAL_TOTAL_SUM_ALIAS)
             deal_desc.to_pay = Utils.prepare_external_field(data, DEAL_SUM_ALIAS)
 
-            incognito = Utils.prepare_deal_incognito(data, DEAL_INCOGNITO_ALIAS)
-            deal_desc.incognito = True if incognito else False
+            deal_desc.incognito = Utils.prepare_deal_incognito_client(data, DEAL_INCOGNITO_ALIAS)
 
         except Exception as e:
             logging.error('Error getting client deal info: %s', e)

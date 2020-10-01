@@ -30,7 +30,12 @@ DEAL_TIME_MAPPING = {
 }
 
 
-DEAL_INCOGNITO_MAPPING = {
+DEAL_INCOGNITO_MAPPING_CLIENT = {
    '0': False,
    '1': True
+}
+
+DEAL_INCOGNITO_MAPPING_OPERATOR = {
+   '0': 'нет',
+   '1': 'ВНИМАНИЕ - ДА!'
 }
