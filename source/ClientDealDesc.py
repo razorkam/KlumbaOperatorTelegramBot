@@ -6,6 +6,7 @@ class ClientDealDesc:
     sum = None
     to_pay = None
     incognito = None
+    flat = None
     photos = []
 
     def get_dict(self):
@@ -16,5 +17,6 @@ class ClientDealDesc:
             'incognito': self.incognito,
             'time': self.time,
             'sum': self.sum,
+            'flat': self.flat,
             'photos': self.photos
         }

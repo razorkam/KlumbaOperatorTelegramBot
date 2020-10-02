@@ -241,6 +241,7 @@ class BitrixWorker:
             deal_desc.time = Utils.prepare_deal_time(data, DEAL_TIME_ALIAS)
             deal_desc.sum = Utils.prepare_external_field(data, DEAL_TOTAL_SUM_ALIAS)
             deal_desc.to_pay = Utils.prepare_external_field(data, DEAL_SUM_ALIAS)
+            deal_desc.flat = Utils.prepare_external_field(data, DEAL_FLAT_ALIAS)
 
             deal_desc.incognito = Utils.prepare_deal_incognito_client(data, DEAL_INCOGNITO_ALIAS)
 
