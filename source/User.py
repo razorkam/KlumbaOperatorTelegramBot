@@ -24,6 +24,7 @@ class User:
         self.photos_list = []
         # description of 'checklist' menu step
         self.checklist = Checklist()
+        self._digest = None
 
     # pickle serializing fields
     def __getstate__(self):
@@ -92,8 +93,11 @@ class User:
     def get_deal_photos(self):
         return self.photos_list
 
-    def get_deal_encoded_photos(self):
-        return [p.b64_encode() for p in self.photos_list]
+    def deal_encode_photos(self):
+        for p in self.photos_list:
+            p.b64_encode()
+
+        return self.get_deal_photos()
 
     def clear_deal_photos(self):
         self.photos_list.clear()
@@ -103,3 +107,9 @@ class User:
 
     def get_state(self):
         return self._state
+
+    def set_digest(self, digest):
+        self._digest = digest
+
+    def get_digest(self):
+        return self._digest

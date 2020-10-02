@@ -47,7 +47,7 @@ class TelegramCommandsHandler:
             self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.UNKNOWN_ERROR})
             return False
 
-        return self.BitrixWorker.update_deal_image(user, deal_id, digest)
+        return self.BitrixWorker.update_deal_image(user, deal_id)
 
     def handle_photo_getting_cancel(self, user):
         user.clear_deal_photos()

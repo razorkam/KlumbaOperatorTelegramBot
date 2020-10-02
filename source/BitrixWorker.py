@@ -55,8 +55,8 @@ class BitrixWorker:
 
         return None
 
-    def update_deal_image(self, user, deal_id, digest):
-        photos_list = user.get_deal_encoded_photos()
+    def update_deal_image(self, user, deal_id):
+        photos_list = user.deal_encode_photos()
 
         if not photos_list:
             self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.NO_PHOTOS_TEXT + '\n'
@@ -78,7 +78,7 @@ class BitrixWorker:
 
         update_obj = {'id': deal_id, 'fields': {DEAL_SMALL_PHOTO_ALIAS: [], DEAL_BIG_PHOTO_ALIAS: [],
                                                 DEAL_STAGE_ALIAS: DEAL_IS_EQUIPPED_STAGE,
-                                                DEAL_CLIENT_URL_ALIAS: digest}}
+                                                DEAL_CLIENT_URL_ALIAS: user.get_digest()}}
 
         is_takeaway = deal['result'][DEAL_SUPPLY_METHOD_ALIAS] == DEAL_IS_FOR_TAKEAWAY
 

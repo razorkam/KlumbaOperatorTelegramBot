@@ -30,8 +30,14 @@ class StorageWorker:
             photos = user.get_deal_photos()
 
             order_digest = ''
+            all_is_on_disk = True
             for p in photos:
                 order_digest += p.name_big
+                if not p.has_been_saved():
+                    all_is_on_disk = False
+
+            if all_is_on_disk:
+                return True
 
             order_digest += (str(time.time()) + str(random.random()))
             order_digest = hashlib.sha256(order_digest.encode()).hexdigest()[:StorageWorker.ORDER_DIGEST_LIMIT]
@@ -46,9 +52,7 @@ class StorageWorker:
 
             for p in photos:
                 with open(os.path.join(StorageWorker.ORDERS_DIR, *(order_digest, p.name_big)), 'wb') as f:
-                    bytes_written = f.write(p.data_big)
-                    if bytes_written != len(p.data_big):
-                        raise Exception("Error writing binary data of photo: inconsistent write attempt")
+                    p.save_big(f)
 
             cursor = StorageWorker.CONN.cursor()
             cursor.execute('insert into orders values(?,?)', (order_digest, deal_id))
@@ -58,7 +62,8 @@ class StorageWorker:
             logging.error("Storage worker critical error - order hasn't been handled: %s", e)
             return None
 
-        return order_digest
+        user.set_digest(order_digest)
+        return True
 
     @staticmethod
     def init_db():
