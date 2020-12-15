@@ -8,17 +8,19 @@ class Photo:
     name_small = None
     name_big = None
     state = None
+    file_id = None
 
     INITIALIZED_AS_BINARY = 1
     IS_ON_DISK = 2
     IS_ENCODED = 3
 
-    def __init__(self, name_small, name_big, data_small, data_big):
+    def __init__(self, name_small, name_big, data_small, data_big, file_id):
         self.data_small = data_small
         self.data_big = data_big
         self.name_small = name_small
         self.name_big = name_big
         self.state = Photo.INITIALIZED_AS_BINARY
+        self.file_id = file_id
 
     def b64_encode(self):
         if self.state == Photo.IS_ON_DISK:

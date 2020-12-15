@@ -15,7 +15,6 @@ class TgWorker:
     REQUESTS_TIMEOUT = 1.5 * GET_UPDATES_PARAMS['timeout']
     REQUESTS_MAX_ATTEMPTS = 5
     GLOBAL_LOOP_ERROR_TIMEOUT = 60  # seconds
-    PROXIES = [creds.HTTPS_PROXY_1, creds.HTTPS_PROXY_2]
     SESSION = requests.session()
     CommandsHandler = None
 
@@ -23,11 +22,9 @@ class TgWorker:
         self.CommandsHandler = TelegramCommandsHandler(self)
 
     def send_request(self, method, params, custom_error_text=''):
-        proxy_index = 0
-
         for a in range(self.REQUESTS_MAX_ATTEMPTS):
             try:
-                response = self.SESSION.post(url=creds.TG_API_URL + method, proxies=self.PROXIES[proxy_index],
+                response = self.SESSION.post(url=creds.TG_API_URL + method,
                                              json=params, timeout=self.REQUESTS_TIMEOUT)
 
                 if response:
@@ -42,40 +39,20 @@ class TgWorker:
                     logging.error('TG response failed%s : Attempt: %s, Called: %s : Request params: %s',
                                   a, response.text, custom_error_text, params)
 
-            except requests.exceptions.ProxyError:
-                logging.error('Proxy #{} got connection error.'.format(proxy_index))
-
-                if proxy_index < (len(self.PROXIES) - 1):
-                    proxy_index += 1
-                    logging.info('Trying proxy #{}'.format(proxy_index))
-                else:
-                    logging.error('All proxies got connection problems. Request failed')
-
             except Exception as e:
                 logging.error('Sending TG api request %s', e)
 
         return {}
 
     def send_file_dl_request(self, url):
-        proxy_index = 0
-
         for a in range(self.REQUESTS_MAX_ATTEMPTS):
             try:
-                response = self.SESSION.get(url, proxies=self.PROXIES[proxy_index], timeout=self.REQUESTS_TIMEOUT)
+                response = self.SESSION.get(url, timeout=self.REQUESTS_TIMEOUT)
 
                 if response:
                     return response
                 else:
                     logging.error('TG downloading file bad response attempt %s : URL: %s ', a, url)
-
-            except requests.exceptions.ProxyError:
-                logging.error('Proxy #{} got connection error.'.format(proxy_index))
-
-                if proxy_index < (len(self.PROXIES) - 1):
-                    proxy_index += 1
-                    logging.info('Trying proxy #{}'.format(proxy_index))
-                else:
-                    logging.error('All proxies got connection problems. Request failed')
 
             except Exception as e:
                 logging.error('Downloading TG file %s', e)

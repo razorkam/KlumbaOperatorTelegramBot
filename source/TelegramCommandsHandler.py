@@ -34,7 +34,7 @@ class TelegramCommandsHandler:
             user.add_deal_photo(Photo(unique_id_small + '_S' '.' + file_extension_small,
                                       unique_id_big + '_B' + '.' + file_extension_big,
                                       photo_content_small,
-                                      photo_content_big))
+                                      photo_content_big, file_id_big))
 
             self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.PHOTO_LOADED_TEXT})
 

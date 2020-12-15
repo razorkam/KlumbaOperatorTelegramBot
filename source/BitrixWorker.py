@@ -78,16 +78,17 @@ class BitrixWorker:
 
         update_obj = {'id': deal_id, 'fields': {DEAL_SMALL_PHOTO_ALIAS: [], DEAL_BIG_PHOTO_ALIAS: [],
                                                 DEAL_STAGE_ALIAS: DEAL_IS_EQUIPPED_STAGE,
-                                                DEAL_CLIENT_URL_ALIAS: user.get_digest()}}
+                                                DEAL_CLIENT_URL_ALIAS: user.get_digest(),
+                                                DEAL_TG_PHOTOS_IDS: []}}
 
         is_takeaway = deal['result'][DEAL_SUPPLY_METHOD_ALIAS] == DEAL_IS_FOR_TAKEAWAY
 
         for photo in photos_list:
             update_obj['fields'][DEAL_SMALL_PHOTO_ALIAS].append({'fileData': [photo.name_small,
                                                                               photo.data_small]})
-
             update_obj['fields'][DEAL_BIG_PHOTO_ALIAS].append({'fileData': [photo.name_big,
                                                                             photo.data_big]})
+            update_obj['fields'][DEAL_TG_PHOTOS_IDS].append(photo.file_id)
 
             logging.info('Chat id %s updating deal %s with photo ids %s:', user.get_chat_id(),
                          deal_id, photo.name_small)
