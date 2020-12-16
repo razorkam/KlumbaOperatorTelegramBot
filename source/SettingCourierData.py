@@ -1,9 +1,6 @@
-# storing user checklist ( all data processing while doing checklist setting step)
-class Checklist:
+# storing user checklist ( all data processing while doing Setting courier step)
+class SettingCourierData:
     def __init__(self):
-        self.photo_data = None
-        self.photo_name = None
-
         self.couriers_dict = {}
         self.courier_id = None
 

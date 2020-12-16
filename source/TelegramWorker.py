@@ -92,9 +92,7 @@ class TgWorker:
             self.CommandsHandler.handle_command(message)
         except Exception as e:
             logging.error('Handling command: %s', e)
-            user.clear_deal_photos()
-            user.clear_checklist()
-            user.set_state_menu()
+            user.reset_state()
             self.send_message(message['chat']['id'], {'text': TextSnippets.UNKNOWN_ERROR + '\n'
                                                               + TextSnippets.BOT_HELP_TEXT})
 

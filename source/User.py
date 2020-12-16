@@ -1,18 +1,22 @@
 from enum import Enum
 from . import creds
-from source.Checklist import *
+from source.DealData import *
 
 
 class UserState(Enum):
     PASSWORD_REQUESTED = 1
-    AUTHORIZED = 2  # user is in menu
+    AUTHORIZED = 2  # user is in menu - #1
     # flowers photos
     LOADING_PHOTOS = 3
 
-    # checklist loading actions
+    # checklist loading actions - #2
     CHECKLIST_SETTING_DEAL_NUMBER = 4
     CHECKLIST_SETTING_COURIER = 5
     CHECKLIST_SETTING_PHOTO = 6
+
+    # setting courier on any deal stage - #3
+    SETTING_COURIER_DEAL_NUMBER = 7
+    SETTING_COURIER_COURIER_CHOOSE = 8
 
 
 class User:
@@ -22,8 +26,8 @@ class User:
         self._chat_id = None
         # encoded photos of 'photos' menu step
         self.photos_list = []
-        # description of 'checklist' menu step
-        self.checklist = Checklist()
+        # description of 'checklist' or 'setting courier' menu step
+        self.deal_data = DealData()
         self._digest = None
 
     # pickle serializing fields
@@ -33,7 +37,7 @@ class User:
     def __setstate__(self, dump):
         self._chat_id, self._state, self._password = dump
         self.photos_list = []
-        self.checklist = Checklist()
+        self.deal_data = DealData()
 
     def has_provided_password(self):
         return self._state != UserState.PASSWORD_REQUESTED and self._password == creds.GLOBAL_AUTH_PASSWORD
@@ -63,6 +67,15 @@ class User:
     def is_checklist_photo_setting(self):
         return self._state == UserState.CHECKLIST_SETTING_PHOTO
 
+    def is_setting_courier_actions_handling(self):
+        return self._state in (UserState.SETTING_COURIER_DEAL_NUMBER, UserState.SETTING_COURIER_COURIER_CHOOSE)
+
+    def is_setting_courier_deal_number_setting(self):
+        return self._state == UserState.SETTING_COURIER_DEAL_NUMBER
+
+    def is_setting_courier_courier_choose(self):
+        return self._state == UserState.SETTING_COURIER_COURIER_CHOOSE
+
     def set_state_checklist_setting_deal_number(self):
         self._state = UserState.CHECKLIST_SETTING_DEAL_NUMBER
 
@@ -71,6 +84,12 @@ class User:
 
     def set_state_checklist_setting_photo(self):
         self._state = UserState.CHECKLIST_SETTING_PHOTO
+
+    def set_state_setting_courier_courier_choose(self):
+        self._state = UserState.SETTING_COURIER_COURIER_CHOOSE
+
+    def set_state_setting_courier_deal_number(self):
+        self._state = UserState.SETTING_COURIER_DEAL_NUMBER
 
     def authorize(self, password):
         self._state = UserState.AUTHORIZED
@@ -102,8 +121,8 @@ class User:
     def clear_deal_photos(self):
         self.photos_list.clear()
 
-    def clear_checklist(self):
-        self.checklist = Checklist()
+    def clear_deal_data(self):
+        self.deal_data = DealData()
 
     def get_state(self):
         return self._state
@@ -113,3 +132,8 @@ class User:
 
     def get_digest(self):
         return self._digest
+
+    def reset_state(self):
+        self.clear_deal_data()
+        self.clear_deal_photos()
+        self.set_state_menu()

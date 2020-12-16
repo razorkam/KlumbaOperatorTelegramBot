@@ -9,6 +9,7 @@ from .ClientDealDesc import ClientDealDesc
 
 from . import Utils
 from . import TextSnippets
+from . import Commands
 
 DEAL_ALREADY_APPROVED = 1
 
@@ -70,7 +71,7 @@ class BitrixWorker:
                                                                     + TextSnippets.SUGGEST_CANCEL_TEXT})
             return False
 
-        if deal['result'][DEAL_STAGE_ALIAS] != DEAL_IS_IN_1C_STAGE and\
+        if deal['result'][DEAL_STAGE_ALIAS] != DEAL_IS_IN_1C_STAGE and \
                 deal['result'][DEAL_STAGE_ALIAS] != DEAL_IS_IN_UNAPPROVED_STAGE:
             self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.PHOTO_LOAD_WRONG_DEAL_STAGE + '\n'
                                                                     + TextSnippets.SUGGEST_CANCEL_TEXT})
@@ -111,23 +112,23 @@ class BitrixWorker:
         user.clear_deal_photos()
         return True
 
-    def process_checklist_deal_info(self, deal_id, user):
+    def process_checklist_deal_info(self, deal_id, user, check_approved=True):
         deal = self._send_request(user, 'crm.deal.get', {'id': deal_id}, notify_user=False)
 
         if not deal or not deal['result']:
             self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.NO_SUCH_DEAL.format(deal_id) + '\n'
-                                                             + TextSnippets.SUGGEST_CANCEL_TEXT})
+                                                                    + TextSnippets.SUGGEST_CANCEL_TEXT})
             return False
 
         data = deal['result']
 
-        if data[DEAL_STAGE_ALIAS] != DEAL_IS_IN_APPROVED_STAGE:
+        if check_approved and data[DEAL_STAGE_ALIAS] != DEAL_IS_IN_APPROVED_STAGE:
             self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.CHECKLIST_LOAD_WRONG_DEAL_STAGE + '\n'
                                                                     + TextSnippets.SUGGEST_CANCEL_TEXT})
             return False
 
-        user.checklist.deal_id = deal_id
-        user.checklist.order = Utils.prepare_external_field(data, DEAL_ORDER_ALIAS)
+        user.deal_data.deal_id = deal_id
+        user.deal_data.order = Utils.prepare_external_field(data, DEAL_ORDER_ALIAS)
 
         contact_data = {}
 
@@ -150,10 +151,10 @@ class BitrixWorker:
         if contact_data[CONTACT_HAS_PHONE_ALIAS] == CONTACT_HAS_PHONE:
             contact_phone = Utils.prepare_external_field(contact_data[CONTACT_PHONE_ALIAS][0], 'VALUE')
 
-        user.checklist.contact = contact_name + ' ' + contact_phone
-        user.checklist.florist = Utils.prepare_external_field(data, DEAL_FLORIST_ALIAS)
-        user.checklist.order_received_by = Utils.prepare_external_field(data, DEAL_ORDER_RECEIVED_BY_ALIAS)
-        user.checklist.total_sum = Utils.prepare_external_field(data, DEAL_TOTAL_SUM_ALIAS)
+        user.deal_data.contact = contact_name + ' ' + contact_phone
+        user.deal_data.florist = Utils.prepare_external_field(data, DEAL_FLORIST_ALIAS)
+        user.deal_data.order_received_by = Utils.prepare_external_field(data, DEAL_ORDER_RECEIVED_BY_ALIAS)
+        user.deal_data.total_sum = Utils.prepare_external_field(data, DEAL_TOTAL_SUM_ALIAS)
 
         payment_type_id = Utils.prepare_external_field(data, DEAL_PAYMENT_TYPE_ALIAS)
         payment_types_dict = {}
@@ -163,9 +164,9 @@ class BitrixWorker:
             payment_types = payment_type_field['result']['LIST']
             payment_types_dict = {pt['ID']: pt['VALUE'] for pt in payment_types}
         except Exception as e:
-            logging.error("Exception getting payment types data, %s", e)
+            logging.error("Exception getting ppassayment types data, %s", e)
 
-        user.checklist.payment_type = Utils.prepare_external_field(payment_types_dict, payment_type_id)
+        user.deal_data.payment_type = Utils.prepare_external_field(payment_types_dict, payment_type_id)
 
         payment_method_id = Utils.prepare_external_field(data, DEAL_PAYMENT_METHOD_ALIAS)
         payment_methods_dict = {}
@@ -177,14 +178,15 @@ class BitrixWorker:
         except Exception as e:
             logging.error("Exception getting payment methods data, %s", e)
 
-        user.checklist.payment_method = Utils.prepare_external_field(payment_methods_dict, payment_method_id)
+        user.deal_data.payment_method = Utils.prepare_external_field(payment_methods_dict, payment_method_id)
 
-        user.checklist.payment_status = Utils.prepare_external_field(data, DEAL_PAYMENT_STATUS_ALIAS)
-        user.checklist.prepaid = Utils.prepare_external_field(data, DEAL_PREPAID_ALIAS)
-        user.checklist.to_pay = Utils.prepare_external_field(data, DEAL_TO_PAY_ALIAS)
-        user.checklist.incognito = Utils.prepare_deal_incognito_operator(data, DEAL_INCOGNITO_ALIAS)
-        user.checklist.order_comment = Utils.prepare_external_field(data, DEAL_ORDER_COMMENT_ALIAS)
-        user.checklist.delivery_comment = Utils.prepare_external_field(data, DEAL_DELIVERY_COMMENT_ALIAS)
+        user.deal_data.payment_status = Utils.prepare_external_field(data, DEAL_PAYMENT_STATUS_ALIAS)
+        user.deal_data.prepaid = Utils.prepare_external_field(data, DEAL_PREPAID_ALIAS)
+        user.deal_data.to_pay = Utils.prepare_external_field(data, DEAL_TO_PAY_ALIAS)
+        user.deal_data.incognito = Utils.prepare_deal_incognito_operator(data, DEAL_INCOGNITO_ALIAS)
+        user.deal_data.order_comment = Utils.prepare_external_field(data, DEAL_ORDER_COMMENT_ALIAS)
+        user.deal_data.delivery_comment = Utils.prepare_external_field(data, DEAL_DELIVERY_COMMENT_ALIAS)
+        user.deal_data.courier_id = Utils.prepare_external_field(data, DEAL_COURIER_ALIAS)
 
         return True
 
@@ -201,11 +203,13 @@ class BitrixWorker:
             .join(Utils.prepare_external_field(c, 'VALUE').split(COURIER_FIELD_DELIMETER)) for c in couriers}
 
     def update_deal_checklist(self, user):
-        update_obj = {'id': user.checklist.deal_id,
-                      'fields': {DEAL_CHECKLIST_ALIAS: {'fileData': [user.checklist.photo_name,
-                                                                     user.checklist.photo_data]},
-                                 DEAL_STAGE_ALIAS: DEAL_IS_IN_DELIVERY_STAGE,
-                                 DEAL_COURIER_ALIAS: user.checklist.courier_id}}
+        update_obj = {'id': user.deal_data.deal_id,
+                      'fields': {DEAL_CHECKLIST_ALIAS: {'fileData': [user.deal_data.photo_name,
+                                                                     user.deal_data.photo_data]},
+                                 DEAL_STAGE_ALIAS: DEAL_IS_IN_DELIVERY_STAGE}}
+
+        if user.deal_data.courier_id != Commands.SKIP_COURIER_DATA:
+            update_obj['fields'][DEAL_COURIER_ALIAS] = user.deal_data.courier_id
 
         result = self._send_request(user, 'crm.deal.update', update_obj)
 
@@ -216,8 +220,22 @@ class BitrixWorker:
                                                                     + TextSnippets.SUGGEST_CANCEL_TEXT})
             return False
 
-        user.clear_checklist()
+        user.clear_deal_data()
         return True
+
+    def update_deal_courier(self, user):
+        update_obj = {'id': user.deal_data.deal_id,
+                      'fields': {DEAL_COURIER_ALIAS: user.deal_data.courier_id}}
+
+        result = self._send_request(user, 'crm.deal.update', update_obj)
+
+        if result['result']:
+            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.DEAL_UPDATED_TEXT})
+        else:
+            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.ERROR_BITRIX_REQUEST + '\n'
+                                                                    + TextSnippets.SUGGEST_CANCEL_TEXT})
+
+        user.clear_deal_data()
 
     def get_deal_info_for_client(self, deal_id):
         try:
@@ -268,8 +286,6 @@ class BitrixWorker:
         except Exception as e:
             logging.error("Exception getting contact data, %s", e)
             return None
-
-
 
     def update_deal_by_client(self, deal_id, data):
         try:
