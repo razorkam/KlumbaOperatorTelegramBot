@@ -248,10 +248,8 @@ class BitrixWorker:
             data = deal['result']
             stage = data[DEAL_STAGE_ALIAS]
 
-            if stage != DEAL_IS_EQUIPPED_STAGE:
-                return None
-
             deal_desc = ClientDealDesc()
+            deal_desc.agreed = (stage != DEAL_IS_EQUIPPED_STAGE)
 
             address, location = Utils.prepare_deal_address(data, DEAL_ADDRESS_ALIAS)
             deal_desc.address = address

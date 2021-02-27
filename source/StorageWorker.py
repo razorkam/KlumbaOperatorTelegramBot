@@ -18,7 +18,7 @@ class StorageWorker:
     ORDER_DIGEST_LIMIT = 8
     DATABASE_NAME = 'orders.db'
     CONN = sqlite3.connect(os.path.join(ORDERS_DIR, DATABASE_NAME))
-    ORDER_EXPIRED_TIME_LIMIT = 24 * 60 * 60  # seconds to order expiration
+    ORDER_EXPIRED_TIME_LIMIT = 30 * 24 * 60 * 60  # days to seconds to order expiration
     LOCKFILE_PATH = os.path.join(ORDERS_DIR, 'file.lock')
     LOCK_TIMEOUT = 60  # sec
     MAINTENANCE_TIME = '03:00'

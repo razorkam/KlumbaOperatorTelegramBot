@@ -41,9 +41,6 @@ def get_deal_info(digest):
         if deal_desc is False:
             return Response("Ошибка при получении данных заказа", status=503)
 
-        if deal_desc is None:
-            return Response('Заказ уже был согласован', status=501)
-
         deal_desc.photos = StorageWorker.get_deal_photos_path(digest)
         rsp = deal_desc.get_dict()
         rsp['id'] = deal_id
