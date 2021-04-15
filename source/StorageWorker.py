@@ -1,143 +1,104 @@
-# all tasks related to orders storage system
-# relates to Client Photos Viewer functions
 import os
-import hashlib
 import schedule
-from threading import Thread
+from threading import Thread, Lock, local
 import time
 import random
 import logging
 import sqlite3
-import shutil
+import pandas as pd
+
+import source.BitrixFieldsAliases as BitrixFieldsAliases
+from source.cmd_handlers.PhotosLoading1 import StorageHandlers as Photos1
+import source.BitrixWorker as BW
+import source.config as cfg
 
 random.seed()
 
+SCHEDULING_SLEEP_INTERVAL = 60  # 1 min
+BITRIX_USERS = pd.DataFrame()
+BITRIX_USERS_LOCK = Lock()
 
-class StorageWorker:
-    ORDERS_DIR = os.path.join(os.getcwd(), 'orders_data')
-    ORDER_DIGEST_LIMIT = 8
-    DATABASE_NAME = 'orders.db'
-    CONN = sqlite3.connect(os.path.join(ORDERS_DIR, DATABASE_NAME))
-    ORDER_EXPIRED_TIME_LIMIT = 30 * 24 * 60 * 60  # days to seconds to order expiration
-    LOCKFILE_PATH = os.path.join(ORDERS_DIR, 'file.lock')
-    LOCK_TIMEOUT = 60  # sec
-    MAINTENANCE_TIME = '03:00'
-    SCHEDULING_SLEEP_INTERVAL = 60 * 60  # 1h
+logger = logging.getLogger(__name__)
+BITRIX_DICTS_DB = local()
 
-    @staticmethod
-    def save_order(user, deal_id):
-        try:
-            photos = user.get_deal_photos()
 
-            order_digest = ''
-            all_is_on_disk = True
-            for p in photos:
-                order_digest += p.name_big
-                if not p.has_been_saved():
-                    all_is_on_disk = False
+# general purpose databases
+def init_bitrix_dicts_db():
+    if not hasattr(BITRIX_DICTS_DB, 'conn'):
+        BITRIX_DICTS_DB.conn = sqlite3.connect(os.path.join(cfg.DATA_DIR_NAME, cfg.BITRIX_DICTS_DATABASE))
 
-            if all_is_on_disk:
+    cursor = BITRIX_DICTS_DB.conn.cursor()
+
+    cursor.execute('create table if not exists deal_times (id text, val text)')
+    BITRIX_DICTS_DB.conn.commit()
+
+
+def download_bitrix_creds():
+    url = BW.get_file_dl_url(BitrixFieldsAliases.BITRIX_USERS_CREDS_FILE_ID)
+    # get file from disk -> DOWNLOAD_URL -> pass to Pandas parser with proper engine
+
+    if not url:
+        return
+
+    creds_sheet = pd.read_excel(io=url, header=0, engine='openpyxl')
+
+    global BITRIX_USERS
+    with BITRIX_USERS_LOCK:
+        BITRIX_USERS = creds_sheet
+
+
+def check_authorization(user):
+    if user.bitrix_login and user.bitrix_password:
+        with BITRIX_USERS_LOCK:
+            id_col_name = BITRIX_USERS.columns[1]
+            login_col_name = BITRIX_USERS.columns[2]
+            password_col_name = BITRIX_USERS.columns[4]
+
+            row = BITRIX_USERS.loc[(BITRIX_USERS[login_col_name] == user.bitrix_login) &
+                                   (BITRIX_USERS[password_col_name] == user.bitrix_password)]
+
+            if not row.empty:
+                user.bitrix_user_id = int(row[id_col_name][0])  # authorized user ID
                 return True
-
-            order_digest += (str(time.time()) + str(random.random()))
-            order_digest = hashlib.sha256(order_digest.encode()).hexdigest()[:StorageWorker.ORDER_DIGEST_LIMIT]
-
-            while os.path.isdir(os.path.join(StorageWorker.ORDERS_DIR, order_digest)):
-                order_digest += str(random.random())
-                order_digest = hashlib.sha256(order_digest.encode()).hexdigest()[:StorageWorker.ORDER_DIGEST_LIMIT]
-
-            order_dir_path = os.path.join(StorageWorker.ORDERS_DIR, order_digest)
-
-            os.mkdir(order_dir_path)
-
-            for p in photos:
-                with open(os.path.join(StorageWorker.ORDERS_DIR, *(order_digest, p.name_big)), 'wb') as f:
-                    p.save_big(f)
-
-            cursor = StorageWorker.CONN.cursor()
-            cursor.execute('insert into orders values(?,?)', (order_digest, deal_id))
-            StorageWorker.CONN.commit()
-
-        except Exception as e:
-            logging.error("Storage worker critical error - order hasn't been handled: %s", e)
-            return None
-
-        user.set_digest(order_digest)
-        return True
-
-    @staticmethod
-    def init_db():
-        cursor = StorageWorker.CONN.cursor()
-
-        cursor.execute('create table if not exists orders (digest text, id text)')
-        StorageWorker.CONN.commit()
-
-    @staticmethod
-    def maintain_storage():
-        StorageWorker.init_db()
-
-        def service_job():
-            try:
-                logging.info("Running orders dir maintenance now!")
-                cur_time = time.time()
-                m_conn = sqlite3.connect(os.path.join(StorageWorker.ORDERS_DIR, StorageWorker.DATABASE_NAME))
-                cursor = m_conn.cursor()
-
-                for entry in os.scandir(StorageWorker.ORDERS_DIR):
-                    delta_time = cur_time - entry.stat().st_mtime
-
-                    order_digest = ''
-                    try:
-                        if entry.is_dir() and delta_time >= StorageWorker.ORDER_EXPIRED_TIME_LIMIT:  # expired
-                            order_digest = entry.name
-                            cursor.execute('delete from orders where digest=?', (order_digest,))
-                            shutil.rmtree(entry.path)
-                    except Exception as e:
-                        logging.error("Maintenance entry {} error: {}".format(order_digest, e))
-
-                m_conn.commit()
-            except Exception as e:
-                logging.error("Maintenance service job error: %s", e)
-
-        schedule.every().day.at(StorageWorker.MAINTENANCE_TIME).do(service_job)
-
-        def thread_fun():
-            try:
-                while True:
-                    schedule.run_pending()
-                    time.sleep(StorageWorker.SCHEDULING_SLEEP_INTERVAL)
-            except:
-                pass
-
-        thread = Thread(target=thread_fun, daemon=True)
-        thread.start()
-
-    @staticmethod
-    def get_deal_id(digest):
-        try:
-            conn = sqlite3.connect(os.path.join(StorageWorker.ORDERS_DIR, StorageWorker.DATABASE_NAME))
-            cursor = conn.cursor()
-            cursor.execute('select * from orders where digest=?', (digest,))
-            data = cursor.fetchall()
-
-            if len(data) == 0:
-                return None
             else:
-                return data[0][1]
-        except Exception as e:
-            logging.error('Error getting deal id by digest: %s', e)
-            return None
+                logger.error('Failed authorization attempt, login: %s, password: %s'
+                             % (user.bitrix_login, user.bitrix_password))
+                user.bitrix_user_id = None
+                return False
 
-    @staticmethod
-    def get_deal_photos_path(digest):
-        photos_path_list = []
 
+def load_bitrix_dicts():
+    BW.load_dicts()
+
+    # separate thread connection
+    if not hasattr(BITRIX_DICTS_DB, 'conn'):
+        BITRIX_DICTS_DB.conn = sqlite3.connect(os.path.join(cfg.DATA_DIR_NAME, cfg.BITRIX_DICTS_DATABASE))
+
+    cursor = BITRIX_DICTS_DB.conn.cursor()
+
+    # some dicts need to be saved to use in Client backend process
+    cursor.execute('delete from deal_times')
+    cursor.executemany('insert into deal_times values (?,?)', BW.DEAL_TIMES.items())
+    BITRIX_DICTS_DB.conn.commit()
+
+
+def maintain_storage():
+    init_bitrix_dicts_db()
+    Photos1.init_db()
+    download_bitrix_creds()
+    load_bitrix_dicts()
+
+    schedule.every().day.at(Photos1.ORDERS_CLEANUP_TIME).do(Photos1.orders_cleanup_job)
+    schedule.every().hour.do(download_bitrix_creds)
+    schedule.every().hour.do(load_bitrix_dicts)
+
+    def thread_fun():
         try:
-            for photo_entry in os.scandir(os.path.join(StorageWorker.ORDERS_DIR, digest)):
-                photos_path_list.append('/' + digest + '/' + photo_entry.name)
-
+            while True:
+                schedule.run_pending()
+                time.sleep(SCHEDULING_SLEEP_INTERVAL)
         except Exception as e:
-            logging.error('Error traversing deal photos to return: %s', e)
-            return []
+            logger.error("Scheduler thread error: %s", e)
 
-        return photos_path_list
+    thread = Thread(target=thread_fun, daemon=True)
+    thread.start()

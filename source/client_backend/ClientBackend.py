@@ -1,24 +1,22 @@
-from flask import Flask, request, jsonify, Response
-from source.StorageWorker import *
-from source.BitrixWorker import *
-
 import logging
-from logging.handlers import RotatingFileHandler
+import sys
+import os
+from flask import Flask, request, jsonify, Response
 
-LOG_MAX_SIZE = 2 * 1024 * 1024  # 2 mbytes
+# include top level project directory to reuse modules
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+
+import source.config as cfg
+
+import StorageHandlers as StorageHandlers
+import BitrixHandlers
 
 app = Flask(__name__)
-bw = BitrixWorker(None)
-
 APP_PORT = 8083
 
-log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
-log_handler = RotatingFileHandler('client_backend.log', mode='a', maxBytes=LOG_MAX_SIZE,
-                                  backupCount=5)
-log_handler.setFormatter(log_formatter)
-log_handler.setLevel(logging.INFO)
-logging.getLogger().setLevel(logging.INFO)
-logging.basicConfig(handlers=[log_handler])
+# journalctl logging when running via systemctl
+logging.basicConfig(level=cfg.LOG_LEVEL, format=cfg.LOG_FORMAT)
+logger = logging.getLogger(__name__)
 
 
 @app.route('/')
@@ -29,39 +27,39 @@ def hello():
 @app.route('/<string:digest>', methods=['GET'])
 def get_deal_info(digest):
     try:
-        logging.info('New get deal info request: %s', digest)
+        logger.info('New get deal info request: %s', digest)
 
-        deal_id = StorageWorker.get_deal_id(digest)
+        deal_id = StorageHandlers.get_deal_id(digest)
 
         if not deal_id:
             return Response('Заказ не найден', status=404)
 
-        deal_desc = bw.get_deal_info_for_client(deal_id)
+        deal_desc = BitrixHandlers.get_deal_info_for_client(deal_id)
 
-        if deal_desc is False:
+        if not deal_desc:
             return Response("Ошибка при получении данных заказа", status=503)
 
-        deal_desc.photos = StorageWorker.get_deal_photos_path(digest)
-        rsp = deal_desc.get_dict()
+        deal_desc.photos = StorageHandlers.get_deal_photos_path(digest)
+        rsp = vars(deal_desc)
         rsp['id'] = deal_id
 
         return jsonify(rsp)
     except Exception as e:
-        logging.error('Get deal request error: %s', e)
+        logger.error('Get deal request error: %s', e)
         return Response('Внутренняя ошибка сервера', status=500)
 
 
 @app.route('/<string:digest>', methods=['POST'])
 def update_deal(digest):
     try:
-        logging.info('New update deal info request: %s', digest)
+        logger.info('New update deal info request: %s', digest)
 
-        deal_id = StorageWorker.get_deal_id(digest)
+        deal_id = StorageHandlers.get_deal_id(digest)
 
         if not deal_id:
             return Response('Заказ не найден', status=404)
 
-        stage_check_result = bw.check_deal_stage_before_update(deal_id)
+        stage_check_result = BitrixHandlers.check_deal_stage_before_update(deal_id)
 
         if stage_check_result is None:
             return Response('Внутренняя ошибка при обновлении заказа', status=503)
@@ -69,16 +67,14 @@ def update_deal(digest):
         if not stage_check_result:
             return Response('Заказ уже был согласован', status=501)
 
-        data = None
         if request.is_json:
             data = request.json
-            pass
         else:
             return Response('Данные клиента должны быть переданы в виде json', status=400)
 
-        logging.info('Request body json data: %s', data)
+        logger.info('Request body json data: %s', data)
 
-        result = bw.update_deal_by_client(deal_id, data)
+        result = BitrixHandlers.update_deal_by_client(deal_id, data)
 
         if not result:
             return Response('Внутренняя ошибка при обновлении заказа', status=503)
@@ -86,7 +82,7 @@ def update_deal(digest):
         return Response('Заказ успешно обновлен!', status=200)
 
     except Exception as e:
-        logging.error('Update deal request error: %s', e)
+        logger.error('Update deal request error: %s', e)
         return Response('Внутренняя ошибка сервера', status=500)
 
 

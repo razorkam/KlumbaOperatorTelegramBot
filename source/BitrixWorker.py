@@ -1,314 +1,262 @@
 import requests
-from . import creds
-import logging
+from threading import Lock
 
-from .BitrixFieldsAliases import *
-from .BitrixFieldMappings import *
-from .MiscConstants import *
-from .ClientDealDesc import ClientDealDesc
+import source.creds as creds
+import source.Utils as Utils
 
-from . import Utils
-from . import TextSnippets
-from . import Commands
+from source.BitrixFieldsAliases import *
+from source.BitrixFieldMappings import *
+from source.config import *
 
-DEAL_ALREADY_APPROVED = 1
+from source.DealData import DealData
+
+logger = logging.getLogger(__name__)
+
+SESSION = requests.session()
+REQUESTS_TIMEOUT = 10
+REQUESTS_MAX_ATTEMPTS = 3
+
+# global bitrix worker error code
+BW_OK = 0
+BW_NO_SUCH_DEAL = 1
+BW_WRONG_STAGE = 2
+
+# bitrix dicts
+PAYMENT_TYPES = {}
+PAYMENT_TYPES_LOCK = Lock()
+PAYMENT_METHODS = {}
+PAYMENT_METHODS_LOCK = Lock()
+FLORISTS = {}
+FLORISTS_LOCK = Lock()
+COURIERS = {}
+COURIERS_LOCK = Lock()
+ORDERS_TYPES = {}
+ORDERS_TYPES_LOCK = Lock()
+DEAL_TIMES = {}
+DEAL_TIMES_LOCK = Lock()
+
+# Bitrix OAuth keys
+# store in Telegram bot persistence to serialize automatically
+OAUTH_LOCK = Lock()
 
 
-class BitrixWorker:
-    SESSION = requests.session()
-    REQUESTS_TIMEOUT = 10
-    REQUESTS_MAX_ATTEMPTS = 3
+def send_request(method, params=None, handle_next=False):
+    if params is None:
+        params = {}
 
-    TgWorker = None
+    for a in range(REQUESTS_MAX_ATTEMPTS):
+        try:
+            response = SESSION.post(url=creds.BITRIX_API_URL + method,
+                                    json=params, timeout=REQUESTS_TIMEOUT)
 
-    def __init__(self, TGWorker):
-        self.TgWorker = TGWorker
+            if response and response.ok:
+                json = response.json()
+                next_counter = json.get('next')
+                result = json.get('result')
 
-    def _send_request(self, user, method, params=None, custom_error_text='', notify_user=True):
-        if params is None:
-            params = {}
+                # handling List[]
+                if result is not None and handle_next and next_counter:
+                    params['start'] = next_counter
+                    result.extend(send_request(method, params, True))
+                    return result
 
-        for a in range(self.REQUESTS_MAX_ATTEMPTS):
-            try:
-                response = self.SESSION.post(url=creds.BITRIX_API_URL + method,
-                                             json=params, timeout=self.REQUESTS_TIMEOUT)
-
-                if response and response.ok:
-                    json = response.json()
-
-                    if 'result' in json:
-                        return json
-                    else:
-                        error = 'Bitrix bad response %s : Attempt: %s, Called: %s : Request params: %s' \
-                                % (a, json, custom_error_text, params)
-                        logging.error(error)
+                if result is not None:
+                    return result
                 else:
-                    error = 'Bitrix response failed - %s : Attempt: %s,  Called: %s : Request params: %s' \
-                            % (a, response.text, custom_error_text, params)
-                    logging.error(error)
+                    error = 'Bitrix bad response: %s\n Attempt: %s\n Request params: %s\n Error:%s' \
+                            % (json, a, params, json.get('error_description'))
+                    logger.error(error)
+            else:
+                error = 'Bitrix request failed - %s : Attempt: %s : Request params: %s' \
+                        % (response.text, a, params)
+                logger.error(error)
 
-            except Exception as e:
-                error = 'Sending Bitrix api request %s' % e
-                logging.error(error)
+        except Exception as e:
+            error = 'Sending Bitrix api request error %s' % e
+            logger.error(error)
 
-        if notify_user:
-            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.ERROR_BITRIX_REQUEST})
+    return None
 
+
+def get_deal(deal_id):
+    result = send_request('crm.deal.get', {'id': deal_id})
+    return result
+
+
+def update_deal(deal_id, fields):
+    result = send_request('crm.deal.update', {'id': deal_id,
+                                              'fields': fields})
+    return result
+
+
+# TODO: batch load if 'next' in result
+def _load_userfield_dict(field_id):
+    result = {}
+
+    try:
+        userfield = send_request('crm.deal.userfield.get', {'id': field_id})
+        userfield_list = userfield['LIST']
+        result = {el['ID']: el['VALUE'] for el in userfield_list}
+    except Exception as e:
+        logger.error("Exception getting userfield dict: %s", e)
+
+    return result
+
+
+def _load_payment_types():
+    global PAYMENT_TYPES
+    result = _load_userfield_dict(PAYMENT_TYPE_FIELD_ID)
+
+    if result:
+        with PAYMENT_TYPES_LOCK:
+            PAYMENT_TYPES = result
+
+
+def _load_payment_methods():
+    global PAYMENT_METHODS
+    result = _load_userfield_dict(PAYMENT_METHOD_FIELD_ID)
+
+    if result:
+        with PAYMENT_METHODS_LOCK:
+            PAYMENT_METHODS = result
+
+
+def _load_couriers():
+    global COURIERS
+    result = _load_userfield_dict(COURIER_FIELD_ID)
+
+    if result:
+        with COURIERS_LOCK:
+            COURIERS = result
+
+
+def _load_orders_types():
+    global ORDERS_TYPES
+    result = _load_userfield_dict(ORDER_TYPE_FIELD_ID)
+
+    if result:
+        with ORDERS_TYPES_LOCK:
+            ORDERS_TYPES = result
+
+
+def _load_deal_times():
+    global DEAL_TIMES
+    result = _load_userfield_dict(DEAL_TIME_FIELD_ID)
+
+    if result:
+        with DEAL_TIMES_LOCK:
+            DEAL_TIMES = result
+
+
+def _load_florists():
+    result = {}
+    params = {USER_POSITION_ALIAS: FLORIST_POSITION_ID}
+
+    try:
+        florists = send_request('user.get', params, handle_next=True)
+
+        result = {f['ID']: Utils.prepare_external_field(f, 'NAME') + ' ' + Utils.prepare_external_field(f, 'LAST_NAME')
+                  for f in florists if f['ACTIVE']}  # self-filtering active users - due to bug in Bitrix24 API
+
+    except Exception as e:
+        logging.error("Exception getting florists, %s", e)
+
+    global FLORISTS
+    if result:
+        with FLORISTS_LOCK:
+            FLORISTS = result
+
+
+def load_dicts():
+    _load_couriers()
+    _load_florists()
+    _load_payment_methods()
+    _load_payment_types()
+    _load_orders_types()
+    _load_deal_times()
+
+
+def process_deal_info(deal_id, check_approved=True):
+    deal = get_deal(deal_id)
+
+    if not deal:
+        return BW_NO_SUCH_DEAL, None
+
+    if check_approved and deal[DEAL_STAGE_ALIAS] != DEAL_IS_IN_APPROVED_STAGE:
+        return BW_WRONG_STAGE, None
+
+    deal_data = DealData()
+    deal_data.deal_id = deal_id
+
+    deal_data.order = Utils.prepare_external_field(deal, DEAL_ORDER_ALIAS)
+
+    contact_id = deal[DEAL_CONTACT_ALIAS]
+    contact_data = send_request('crm.contact.get',
+                                {'id': contact_id})
+
+    contact_name = Utils.prepare_external_field(contact_data, CONTACT_USER_NAME_ALIAS)
+    contact_phone = ''
+
+    if contact_data.get(CONTACT_HAS_PHONE_ALIAS) == CONTACT_HAS_PHONE:
+        contact_phone = Utils.prepare_external_field(contact_data[CONTACT_PHONE_ALIAS][0], 'VALUE')
+
+    deal_data.contact = contact_name + ' ' + contact_phone
+    deal_data.order_received_by = Utils.prepare_external_field(deal, DEAL_ORDER_RECEIVED_BY_ALIAS)
+    deal_data.total_sum = Utils.prepare_external_field(deal, DEAL_TOTAL_SUM_ALIAS)
+
+    payment_type_id = Utils.prepare_external_field(deal, DEAL_PAYMENT_TYPE_ALIAS)
+    deal_data.payment_type = Utils.prepare_external_field(PAYMENT_TYPES, payment_type_id, PAYMENT_TYPES_LOCK)
+
+    payment_method_id = Utils.prepare_external_field(deal, DEAL_PAYMENT_METHOD_ALIAS)
+
+    deal_data.payment_method = Utils.prepare_external_field(PAYMENT_METHODS, payment_method_id, PAYMENT_METHODS_LOCK)
+
+    deal_data.payment_status = Utils.prepare_external_field(deal, DEAL_PAYMENT_STATUS_ALIAS)
+    deal_data.prepaid = Utils.prepare_external_field(deal, DEAL_PREPAID_ALIAS)
+    deal_data.to_pay = Utils.prepare_external_field(deal, DEAL_TO_PAY_ALIAS)
+    deal_data.incognito = Utils.prepare_deal_incognito_operator(deal, DEAL_INCOGNITO_ALIAS)
+    deal_data.order_comment = Utils.prepare_external_field(deal, DEAL_ORDER_COMMENT_ALIAS)
+    deal_data.delivery_comment = Utils.prepare_external_field(deal, DEAL_DELIVERY_COMMENT_ALIAS)
+    deal_data.courier_id = Utils.prepare_external_field(deal, DEAL_COURIER_ALIAS)
+    deal_data.florist_id = Utils.prepare_external_field(deal, DEAL_FLORIST_NEW_ALIAS)
+    deal_data.order_type_id = Utils.prepare_external_field(deal, DEAL_ORDER_TYPE_ALIAS)
+
+    return BW_OK, deal_data
+
+
+def get_file_dl_url(bitrix_file_id):
+    file = send_request('disk.file.get',
+                        {'id': bitrix_file_id})
+
+    dl_url = file.get(DISK_FILE_DL_URL_ALIAS)
+
+    if not dl_url:
+        logger.error('Error loading Bitrix file metadata: no URL provided')
         return None
 
-    def update_deal_image(self, user, deal_id):
-        photos_list = user.deal_encode_photos()
+    return dl_url
 
-        if not photos_list:
-            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.NO_PHOTOS_TEXT + '\n'
-                                                                    + TextSnippets.SUGGEST_CANCEL_TEXT})
-            return False
 
-        deal = self._send_request(user, 'crm.deal.get', {'id': deal_id}, notify_user=False)
-
-        if not deal or not deal['result']:
-            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.NO_SUCH_DEAL.format(deal_id) + '\n'
-                                                                    + TextSnippets.SUGGEST_CANCEL_TEXT})
-            return False
-
-        if deal['result'][DEAL_STAGE_ALIAS] != DEAL_IS_IN_1C_STAGE and \
-                deal['result'][DEAL_STAGE_ALIAS] != DEAL_IS_IN_UNAPPROVED_STAGE:
-            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.PHOTO_LOAD_WRONG_DEAL_STAGE + '\n'
-                                                                    + TextSnippets.SUGGEST_CANCEL_TEXT})
-            return False
-
-        update_obj = {'id': deal_id, 'fields': {DEAL_SMALL_PHOTO_ALIAS: [], DEAL_BIG_PHOTO_ALIAS: [],
-                                                DEAL_STAGE_ALIAS: DEAL_IS_EQUIPPED_STAGE,
-                                                DEAL_CLIENT_URL_ALIAS: user.get_digest(),
-                                                DEAL_TG_PHOTOS_IDS: []}}
-
-        is_takeaway = deal['result'][DEAL_SUPPLY_METHOD_ALIAS] == DEAL_IS_FOR_TAKEAWAY
-
-        for photo in photos_list:
-            update_obj['fields'][DEAL_SMALL_PHOTO_ALIAS].append({'fileData': [photo.name_small,
-                                                                              photo.data_small]})
-            update_obj['fields'][DEAL_BIG_PHOTO_ALIAS].append({'fileData': [photo.name_big,
-                                                                            photo.data_big]})
-            update_obj['fields'][DEAL_TG_PHOTOS_IDS].append(photo.file_id)
-
-            logging.info('Chat id %s updating deal %s with photo ids %s:', user.get_chat_id(),
-                         deal_id, photo.name_small)
-
-        # load fake photo to checklist in case of takeaway deal
-        if is_takeaway:
-            fake_photo = photos_list[0]
-            update_obj['fields'][DEAL_CHECKLIST_ALIAS] = {'fileData': [fake_photo.name_small,
-                                                                       fake_photo.data_small]}
-
-        result = self._send_request(user, 'crm.deal.update', update_obj)
-
-        if result['result']:
-            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.DEAL_UPDATED_TEXT})
-        else:
-            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.ERROR_BITRIX_REQUEST + '\n'
-                                                                    + TextSnippets.SUGGEST_CANCEL_TEXT})
-            return False
-
-        user.clear_deal_photos()
-        return True
-
-    def process_checklist_deal_info(self, deal_id, user, check_approved=True):
-        deal = self._send_request(user, 'crm.deal.get', {'id': deal_id}, notify_user=False)
-
-        if not deal or not deal['result']:
-            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.NO_SUCH_DEAL.format(deal_id) + '\n'
-                                                                    + TextSnippets.SUGGEST_CANCEL_TEXT})
-            return False
-
-        data = deal['result']
-
-        if check_approved and data[DEAL_STAGE_ALIAS] != DEAL_IS_IN_APPROVED_STAGE:
-            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.CHECKLIST_LOAD_WRONG_DEAL_STAGE + '\n'
-                                                                    + TextSnippets.SUGGEST_CANCEL_TEXT})
-            return False
-
-        user.deal_data.deal_id = deal_id
-        user.deal_data.order = Utils.prepare_external_field(data, DEAL_ORDER_ALIAS)
-
-        contact_data = {}
-
+def refresh_oauth(refresh_token):
+    for a in range(REQUESTS_MAX_ATTEMPTS):
         try:
-            contact_id = data[DEAL_CONTACT_ALIAS]
-            contact_data = self._send_request(user, 'crm.contact.get',
-                                              {'id': contact_id}, notify_user=False)
+            response = SESSION.get(
+                url=creds.BITRIX_OAUTH_REFRESH_URL.format(refresh_token),
+                timeout=REQUESTS_TIMEOUT)
 
-            if 'result' in contact_data:
-                contact_data = contact_data['result']
+            if response and response.ok:
+                json = response.json()
+
+                access_token = json.get('access_token')
+                refresh_token = json.get('refresh_token')
+
+                logger.info('OAuth refreshed')
+                return access_token, refresh_token
             else:
-                contact_data = {}
+                logger.error("Error OAuth refreshing: %s", response)
 
         except Exception as e:
-            logging.error("Exception getting contact data, %s", e)
+            error = 'Bitrix OAuth refresh exception %s' % e
+            logger.error(error)
 
-        contact_name = Utils.prepare_external_field(contact_data, CONTACT_USER_NAME_ALIAS)
-        contact_phone = ''
-
-        if contact_data[CONTACT_HAS_PHONE_ALIAS] == CONTACT_HAS_PHONE:
-            contact_phone = Utils.prepare_external_field(contact_data[CONTACT_PHONE_ALIAS][0], 'VALUE')
-
-        user.deal_data.contact = contact_name + ' ' + contact_phone
-        user.deal_data.florist = Utils.prepare_external_field(data, DEAL_FLORIST_ALIAS)
-        user.deal_data.order_received_by = Utils.prepare_external_field(data, DEAL_ORDER_RECEIVED_BY_ALIAS)
-        user.deal_data.total_sum = Utils.prepare_external_field(data, DEAL_TOTAL_SUM_ALIAS)
-
-        payment_type_id = Utils.prepare_external_field(data, DEAL_PAYMENT_TYPE_ALIAS)
-        payment_types_dict = {}
-
-        try:
-            payment_type_field = self._send_request(user, 'crm.deal.userfield.get', {'id': PAYMENT_TYPE_FIELD_ID})
-            payment_types = payment_type_field['result']['LIST']
-            payment_types_dict = {pt['ID']: pt['VALUE'] for pt in payment_types}
-        except Exception as e:
-            logging.error("Exception getting ppassayment types data, %s", e)
-
-        user.deal_data.payment_type = Utils.prepare_external_field(payment_types_dict, payment_type_id)
-
-        payment_method_id = Utils.prepare_external_field(data, DEAL_PAYMENT_METHOD_ALIAS)
-        payment_methods_dict = {}
-
-        try:
-            payment_method_field = self._send_request(user, 'crm.deal.userfield.get', {'id': PAYMENT_METHOD_FIELD_ID})
-            payment_methods = payment_method_field['result']['LIST']
-            payment_methods_dict = {pt['ID']: pt['VALUE'] for pt in payment_methods}
-        except Exception as e:
-            logging.error("Exception getting payment methods data, %s", e)
-
-        user.deal_data.payment_method = Utils.prepare_external_field(payment_methods_dict, payment_method_id)
-
-        user.deal_data.payment_status = Utils.prepare_external_field(data, DEAL_PAYMENT_STATUS_ALIAS)
-        user.deal_data.prepaid = Utils.prepare_external_field(data, DEAL_PREPAID_ALIAS)
-        user.deal_data.to_pay = Utils.prepare_external_field(data, DEAL_TO_PAY_ALIAS)
-        user.deal_data.incognito = Utils.prepare_deal_incognito_operator(data, DEAL_INCOGNITO_ALIAS)
-        user.deal_data.order_comment = Utils.prepare_external_field(data, DEAL_ORDER_COMMENT_ALIAS)
-        user.deal_data.delivery_comment = Utils.prepare_external_field(data, DEAL_DELIVERY_COMMENT_ALIAS)
-        user.deal_data.courier_id = Utils.prepare_external_field(data, DEAL_COURIER_ALIAS)
-
-        return True
-
-    def get_couriers_list(self, user):
-        couriers = []
-
-        try:
-            courier_field = self._send_request(user, 'crm.deal.userfield.get', {'id': COURIER_FIELD_ID})
-            couriers = courier_field['result']['LIST']
-        except Exception as e:
-            logging.error("Exception getting couriers data, %s", e)
-
-        return {c['ID']: (' ' + COURIER_FIELD_DELIMETER + ' ')
-            .join(Utils.prepare_external_field(c, 'VALUE').split(COURIER_FIELD_DELIMETER)) for c in couriers}
-
-    def update_deal_checklist(self, user):
-        update_obj = {'id': user.deal_data.deal_id,
-                      'fields': {DEAL_CHECKLIST_ALIAS: {'fileData': [user.deal_data.photo_name,
-                                                                     user.deal_data.photo_data]},
-                                 DEAL_STAGE_ALIAS: DEAL_IS_IN_DELIVERY_STAGE}}
-
-        if user.deal_data.courier_id != Commands.SKIP_COURIER_DATA:
-            update_obj['fields'][DEAL_COURIER_ALIAS] = user.deal_data.courier_id
-
-        result = self._send_request(user, 'crm.deal.update', update_obj)
-
-        if result['result']:
-            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.DEAL_UPDATED_TEXT})
-        else:
-            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.ERROR_BITRIX_REQUEST + '\n'
-                                                                    + TextSnippets.SUGGEST_CANCEL_TEXT})
-            return False
-
-        user.clear_deal_data()
-        return True
-
-    def update_deal_courier(self, user):
-        update_obj = {'id': user.deal_data.deal_id,
-                      'fields': {DEAL_COURIER_ALIAS: user.deal_data.courier_id}}
-
-        result = self._send_request(user, 'crm.deal.update', update_obj)
-
-        if result['result']:
-            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.DEAL_UPDATED_TEXT})
-        else:
-            self.TgWorker.send_message(user.get_chat_id(), {'text': TextSnippets.ERROR_BITRIX_REQUEST + '\n'
-                                                                    + TextSnippets.SUGGEST_CANCEL_TEXT})
-
-        user.clear_deal_data()
-
-    def get_deal_info_for_client(self, deal_id):
-        try:
-            deal = self._send_request(None, 'crm.deal.get', {'id': deal_id}, notify_user=False)
-
-            if not deal or not deal['result']:
-                logging.error('Cant get deal info for deal %s', deal_id)
-                return False
-
-            data = deal['result']
-            stage = data[DEAL_STAGE_ALIAS]
-
-            deal_desc = ClientDealDesc()
-            deal_desc.agreed = (stage != DEAL_IS_EQUIPPED_STAGE)
-
-            address, location = Utils.prepare_deal_address(data, DEAL_ADDRESS_ALIAS)
-            deal_desc.address = address
-
-            deal_desc.date = Utils.prepare_deal_date(data, DEAL_DATE_ALIAS)
-            deal_desc.time = Utils.prepare_deal_time(data, DEAL_TIME_ALIAS)
-            deal_desc.sum = Utils.prepare_external_field(data, DEAL_TOTAL_SUM_ALIAS)
-            deal_desc.to_pay = Utils.prepare_external_field(data, DEAL_SUM_ALIAS)
-            deal_desc.flat = Utils.prepare_external_field(data, DEAL_FLAT_ALIAS)
-
-            deal_desc.incognito = Utils.prepare_deal_incognito_client(data, DEAL_INCOGNITO_ALIAS)
-
-        except Exception as e:
-            logging.error('Error getting client deal info: %s', e)
-            return False
-
-        return deal_desc
-
-    def check_deal_stage_before_update(self, deal_id):
-        try:
-            deal = self._send_request(None, 'crm.deal.get', {'id': deal_id}, notify_user=False)
-
-            if not deal or not deal['result']:
-                logging.error('Cant get deal info for deal %s', deal_id)
-                return None
-
-            data = deal['result']
-            stage = data[DEAL_STAGE_ALIAS]
-
-            return stage == DEAL_IS_EQUIPPED_STAGE
-
-        except Exception as e:
-            logging.error("Exception getting contact data, %s", e)
-            return None
-
-    def update_deal_by_client(self, deal_id, data):
-        try:
-            comment = Utils.get_field(data, REQUEST_COMMENT_ALIAS)
-            approved = Utils.get_field(data, REQUEST_APPROVED_ALIAS)
-            call_me_back = Utils.get_field(data, REQUEST_CALLMEBACK_ALIAS)
-
-            update_obj = {
-                'id': deal_id,
-                'fields': {
-                    DEAL_CLIENT_COMMENT_ALIAS: comment,
-                    DEAL_STAGE_ALIAS: DEAL_IS_IN_APPROVED_STAGE if approved else DEAL_IS_IN_UNAPPROVED_STAGE,
-                    DEAL_CLIENT_CALLMEBACK_ALIAS: call_me_back,
-                    DEAL_COMMENT_APPROVED_ALIAS: TextSnippets.DEAL_COMMENT_APPROVED_STUB if approved else None
-                }
-            }
-
-            result = self._send_request(None, 'crm.deal.update', update_obj)
-
-            if result['result']:
-                return True
-            else:
-                logging.error('Error updating client deal info: %s', result)
-                return False
-
-        except Exception as e:
-            logging.error('Error updating client deal info: %s', e)
-            return False
+    return None, None

@@ -1,174 +1,109 @@
-from .UserStore import UserStore
-from .User import User
+from .User import State
 from . import creds
-from .TelegramCommandsHandler import *
-import requests
+from . import TextSnippets as GlobalTxt, config
+from . import Commands as Cmd
+from . import TelegramWorkerStarter as Starter
+from . import BitrixWorker as BW
+
+import source.cmd_handlers.PhotosLoading1.TgHandlers as PhotoLoading1
+import source.cmd_handlers.Checklist2.TgHandlers as Checklist2
+import source.cmd_handlers.Courier3.TgHandlers as Courier3
+import source.cmd_handlers.Florist4.TgHandlers as Florist4
+import source.cmd_handlers.FloristOrder5.TgHandlers as FloristOrders5
+
 import logging
-import time
+import os
+import traceback
+
+from telegram.ext import Updater, MessageHandler, Filters, PicklePersistence,\
+    ConversationHandler, CommandHandler, CallbackContext
+
+from telegram import ParseMode
+
+from telegram import Update
 
 
-class TgWorker:
-    USERS = UserStore()
-    MESSAGE_UPDATE_TYPE = 'message'
-    # last update offset / incoming msg limit / long polling timeout / allowed messages types
-    GET_UPDATES_PARAMS = {'offset': 0, 'limit': 100, 'timeout': 30, 'allowed_updates': [MESSAGE_UPDATE_TYPE]}
-    REQUESTS_TIMEOUT = 1.5 * GET_UPDATES_PARAMS['timeout']
-    REQUESTS_MAX_ATTEMPTS = 5
-    GLOBAL_LOOP_ERROR_TIMEOUT = 60  # seconds
-    SESSION = requests.session()
-    CommandsHandler = None
+logger = logging.getLogger(__name__)
 
-    def __init__(self):
-        self.CommandsHandler = TelegramCommandsHandler(self)
 
-    def send_request(self, method, params, custom_error_text=''):
-        for a in range(self.REQUESTS_MAX_ATTEMPTS):
-            try:
-                response = self.SESSION.post(url=creds.TG_API_URL + method,
-                                             json=params, timeout=self.REQUESTS_TIMEOUT)
+def handle_login(update, context):
+    user = context.user_data.get(config.USER_PERSISTENT_KEY)
+    user.bitrix_login = update.message.text
+    update.message.reply_markdown_v2(GlobalTxt.REQUEST_PASSWORD_MESSAGE)
+    return State.PASSWORD_REQUESTED
 
-                if response:
-                    json = response.json()
 
-                    if json['ok']:
-                        return json
-                    else:
-                        logging.error('TG bad response %s : Attempt: %s, Called: %s : Request params: %s',
-                                      a, json, custom_error_text, params)
-                else:
-                    logging.error('TG response failed%s : Attempt: %s, Called: %s : Request params: %s',
-                                  a, response.text, custom_error_text, params)
+def handle_password(update, context):
+    user = context.user_data.get(config.USER_PERSISTENT_KEY)
+    user.bitrix_password = update.message.text
+    return Starter.restart(update, context)
 
-            except Exception as e:
-                logging.error('Sending TG api request %s', e)
 
-        return {}
+def error_handler(update: Update, context):
+    try:
+        logger.error(msg="Exception while handling Telegram update:", exc_info=context.error)
 
-    def send_file_dl_request(self, url):
-        for a in range(self.REQUESTS_MAX_ATTEMPTS):
-            try:
-                response = self.SESSION.get(url, timeout=self.REQUESTS_TIMEOUT)
+        tb_list = traceback.format_exception(None, context.error, context.error.__traceback__)
+        tb_string = ''.join(tb_list)
 
-                if response:
-                    return response
-                else:
-                    logging.error('TG downloading file bad response attempt %s : URL: %s ', a, url)
+        logger.error(tb_string)
 
-            except Exception as e:
-                logging.error('Downloading TG file %s', e)
+        # don't confuse user with particular error data
+        if update:
+            # don't confuse user with particular errors data
+            update.effective_user.send_message(text=GlobalTxt.UNKNOWN_ERROR, parse_mode=ParseMode.MARKDOWN_V2)
+    except Exception as e:
+        logger.error(msg="Exception while handling lower-level exception:", exc_info=e)
 
-        return {}
 
-    def send_message(self, chat_id, message_object, formatting='Markdown'):
-        message_object['chat_id'] = chat_id
-        message_object['parse_mode'] = formatting
-        return self.send_request('sendMessage', message_object, 'Message sending')
+cv_handler = ConversationHandler(
+        entry_points=[CommandHandler([Cmd.START, Cmd.CANCEL], Starter.restart)],
+        states={
+            State.LOGIN_REQUESTED: [MessageHandler(Filters.text, handle_login)],
+            State.PASSWORD_REQUESTED: [MessageHandler(Filters.text, handle_password)],
+            State.IN_MENU: [PhotoLoading1.cv_handler,
+                            Checklist2.cv_handler,
+                            Courier3.cv_handler,
+                            Florist4.cv_handler,
+                            FloristOrders5.cv_handler]  # all conv handlers here
+        },
+        fallbacks=[CommandHandler([Cmd.START, Cmd.CANCEL], Starter.restart),
+                   MessageHandler(Filters.all, Starter.global_fallback)],
+    )
 
-    def get_user_file(self, user, file_id):
-        file = self.send_request('getFile', {'file_id': file_id})
-        file_path = None
-        file_extension = None
 
-        try:
-            file_path = file['result']['file_path']
-        except Exception:
-            self.send_message(user.get_chat_id(), {'text': TextSnippets.FILE_LOADING_FAILED + '\n' +
-                                                           TextSnippets.SUGGEST_CANCEL_TEXT})
-            return None, None
+def bitrix_oauth_update_job(context: CallbackContext):
+    with BW.OAUTH_LOCK:
+        refresh_token = context.bot_data[config.BOT_REFRESH_TOKEN_PERSISTENT_KEY]
+        a_token, r_token = BW.refresh_oauth(refresh_token)
 
-        result = self.send_file_dl_request(creds.FILE_DL_LINK.format(file_path))
+        if a_token:
+            context.bot_data[config.BOT_ACCESS_TOKEN_PERSISTENT_KEY] = a_token
+            context.bot_data[config.BOT_REFRESH_TOKEN_PERSISTENT_KEY] = r_token
 
-        if not result:
-            self.send_message(user.get_chat_id(), {'text': TextSnippets.FILE_LOADING_FAILED + '\n' +
-                                                           TextSnippets.SUGGEST_CANCEL_TEXT})
-            return None, None
 
-        file_extension = file_path.split('.')[-1]
+# entry point
+def run():
+    os.makedirs(config.DATA_DIR_NAME, exist_ok=True)
+    storage = PicklePersistence(filename=os.path.join(config.DATA_DIR_NAME, config.TG_STORAGE_NAME))
 
-        return result.content, file_extension
+    updater = Updater(creds.TG_BOT_TOKEN, persistence=storage)
+    dispatcher = updater.dispatcher
 
-    def handle_user_command(self, user, message):
-        try:
-            self.CommandsHandler.handle_command(message)
-        except Exception as e:
-            logging.error('Handling command: %s', e)
-            user.reset_state()
-            self.send_message(message['chat']['id'], {'text': TextSnippets.UNKNOWN_ERROR + '\n'
-                                                              + TextSnippets.BOT_HELP_TEXT})
+    # handle Bitrix OAuth keys update here in job queue
+    bot_data = dispatcher.bot_data
+    if config.BOT_ACCESS_TOKEN_PERSISTENT_KEY not in bot_data:
+        bot_data[config.BOT_ACCESS_TOKEN_PERSISTENT_KEY] = creds.BITRIX_APP_ACCESS_TOKEN
+        bot_data[config.BOT_REFRESH_TOKEN_PERSISTENT_KEY] = creds.BITRIX_APP_REFRESH_TOKEN
 
-    def handle_message(self, message):
-        user_id = message['from']['id']
-        chat_id = message['chat']['id']
+    jq = updater.job_queue
+    jq.run_repeating(bitrix_oauth_update_job, interval=config.BITRIX_OAUTH_UPDATE_INTERVAL, first=1)
 
-        # has user been already cached?-
-        if self.USERS.has_user(user_id):
-            user = self.USERS.get_user(user_id)
+    dispatcher.add_handler(cv_handler)
+    for fb in cv_handler.fallbacks:
+        dispatcher.add_handler(fb)
 
-            if chat_id != user.get_chat_id():
-                user._chat_id = chat_id
+    dispatcher.add_error_handler(error_handler)
 
-            if user.has_provided_password():
-                self.handle_user_command(user, message)
-            else:
-                try:
-                    provided_password = message['text']
-
-                    if provided_password == creds.GLOBAL_AUTH_PASSWORD:
-                        self.USERS.authorize(user_id, provided_password)
-                    else:
-                        logging.error('Invalid password authorization attempt, user: ' + user_id)
-                        raise Exception()
-                except Exception:
-                    self.send_message(chat_id, {'text': TextSnippets.AUTHORIZATION_UNSUCCESSFUL})
-                else:
-                    self.send_message(chat_id, {'text': TextSnippets.AUTHORIZATION_SUCCESSFUL})
-                    self.send_message(chat_id, {'text': TextSnippets.BOT_HELP_TEXT})
-
-        else:
-            self.send_message(chat_id, {'text': TextSnippets.REQUEST_PASS_MESSAGE})
-            self.USERS.add_user(user_id, User())
-
-    def handle_update(self, update):
-        try:
-            if self.MESSAGE_UPDATE_TYPE in update:
-                self.handle_message(update[self.MESSAGE_UPDATE_TYPE])
-            else:
-                raise Exception('Unknown update type: %s' % update)
-        except Exception as e:
-            logging.error('Handling TG response update: %s', e)
-
-    def base_response_handler(self, json_response):
-        try:
-            if json_response['result']:
-                logging.info(json_response)
-
-            max_update_id = self.GET_UPDATES_PARAMS['offset']
-            updates = json_response['result']
-            for update in updates:
-                cur_update_id = update['update_id']
-                if cur_update_id > max_update_id:
-                    max_update_id = cur_update_id
-
-                # TODO: thread for each user?
-                self.handle_update(update)
-
-            if updates:
-                self.GET_UPDATES_PARAMS['offset'] = max_update_id + 1
-
-        except Exception as e:
-            logging.error('Base TG response exception handler: %s', e)
-
-    # entry point
-    def run(self):
-        self.USERS.load_user_store()
-
-        while True:
-            response = self.send_request('getUpdates', self.GET_UPDATES_PARAMS, 'Main getting updates')
-
-            # prevent logs spamming in case of network problems
-            if not response:
-                time.sleep(self.GLOBAL_LOOP_ERROR_TIMEOUT)
-
-            self.base_response_handler(response)
-            # TODO: multithreading timer for updates?
-            self.USERS.update_user_store()
+    updater.start_polling(allowed_updates=Update.ALL_TYPES)
+    updater.idle()

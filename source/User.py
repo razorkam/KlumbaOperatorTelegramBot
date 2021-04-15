@@ -1,11 +1,18 @@
-from enum import Enum
-from . import creds
+import logging
+from functools import wraps
+
+import source.config as cfg
 from source.DealData import *
+from source.cmd_handlers.PhotosLoading1.UserData import UserData as PhotosLoading1UserData
+from source.cmd_handlers.FloristOrder5.UserData import UserData as FloristOrder5UserData
+
+logger = logging.getLogger(__name__)
 
 
-class UserState(Enum):
+class State:
+    LOGIN_REQUESTED = 0
     PASSWORD_REQUESTED = 1
-    AUTHORIZED = 2  # user is in menu - #1
+    IN_MENU = 2  # user is in menu - #1
     # flowers photos
     LOADING_PHOTOS = 3
 
@@ -18,122 +25,56 @@ class UserState(Enum):
     SETTING_COURIER_DEAL_NUMBER = 7
     SETTING_COURIER_COURIER_CHOOSE = 8
 
+    # florist setting - # 4
+    SETTING_FLORIST_DEAL_NUMBER = 9
+    SETTING_FLORIST_FLORIST_CHOOSE = 10
+
+    # florist operations - # 5
+    FLORIST_ORDERS_LISTING = 11
+    FLORIST_SELECTING_ORDER = 12
+
+
+class MenuStep:
+    UNSPECIFIED = 0
+    PHOTOS = 1
+    CHECKLIST = 2
+    COURIER = 3
+    FLORIST = 4
+    FLORIST_ORDERS = 5
+
+
+# setter decorator for Telegram callbacks only [Update, Context]
+def menu_step_entry(step: MenuStep):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            user = args[1].user_data.get(cfg.USER_PERSISTENT_KEY)
+
+            if user:
+                user.menu_step = step
+
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
 
 class User:
     def __init__(self):
-        self._password = None
-        self._state = UserState.PASSWORD_REQUESTED
-        self._chat_id = None
-        # encoded photos of 'photos' menu step
-        self.photos_list = []
+        self.bitrix_login = None
+        self.bitrix_password = None
+        self.bitrix_user_id = None
+        self._state = State.LOGIN_REQUESTED
+        # step 1(photo loading data)
+        self.photos_loading_1 = PhotosLoading1UserData()
+        # step 5(florist orders listing)
+        self.florist_order_5 = FloristOrder5UserData()
+
         # description of 'checklist' or 'setting courier' menu step
         self.deal_data = DealData()
-        self._digest = None
 
-    # pickle serializing fields
-    def __getstate__(self):
-        return self._chat_id, self._state, self._password
-
-    def __setstate__(self, dump):
-        self._chat_id, self._state, self._password = dump
-        self.photos_list = []
-        self.deal_data = DealData()
-
-    def has_provided_password(self):
-        return self._state != UserState.PASSWORD_REQUESTED and self._password == creds.GLOBAL_AUTH_PASSWORD
-
-    def is_in_menu(self):
-        return self._state == UserState.AUTHORIZED
-
-    def set_state_menu(self):
-        self._state = UserState.AUTHORIZED
-
-    def is_photos_loading(self):
-        return self._state == UserState.LOADING_PHOTOS
-
-    def set_state_loading_photos(self):
-        self._state = UserState.LOADING_PHOTOS
-
-    def is_checklist_actions_handling(self):
-        return self._state in (UserState.CHECKLIST_SETTING_DEAL_NUMBER, UserState.CHECKLIST_SETTING_COURIER,
-                               UserState.CHECKLIST_SETTING_PHOTO)
-
-    def is_checklist_deal_number_setting(self):
-        return self._state == UserState.CHECKLIST_SETTING_DEAL_NUMBER
-
-    def is_checklist_courier_setting(self):
-        return self._state == UserState.CHECKLIST_SETTING_COURIER
-
-    def is_checklist_photo_setting(self):
-        return self._state == UserState.CHECKLIST_SETTING_PHOTO
-
-    def is_setting_courier_actions_handling(self):
-        return self._state in (UserState.SETTING_COURIER_DEAL_NUMBER, UserState.SETTING_COURIER_COURIER_CHOOSE)
-
-    def is_setting_courier_deal_number_setting(self):
-        return self._state == UserState.SETTING_COURIER_DEAL_NUMBER
-
-    def is_setting_courier_courier_choose(self):
-        return self._state == UserState.SETTING_COURIER_COURIER_CHOOSE
-
-    def set_state_checklist_setting_deal_number(self):
-        self._state = UserState.CHECKLIST_SETTING_DEAL_NUMBER
-
-    def set_state_checklist_setting_courier(self):
-        self._state = UserState.CHECKLIST_SETTING_COURIER
-
-    def set_state_checklist_setting_photo(self):
-        self._state = UserState.CHECKLIST_SETTING_PHOTO
-
-    def set_state_setting_courier_courier_choose(self):
-        self._state = UserState.SETTING_COURIER_COURIER_CHOOSE
-
-    def set_state_setting_courier_deal_number(self):
-        self._state = UserState.SETTING_COURIER_DEAL_NUMBER
-
-    def authorize(self, password):
-        self._state = UserState.AUTHORIZED
-        self._password = password
-
-    def unauthorize(self):
-        self._state = UserState.PASSWORD_REQUESTED
-        self._password = None
-        self._chat_id = None
-
-    def get_password(self):
-        return self._password
-
-    def get_chat_id(self):
-        return self._chat_id
-
-    def add_deal_photo(self, photo):
-        self.photos_list.append(photo)
-
-    def get_deal_photos(self):
-        return self.photos_list
-
-    def deal_encode_photos(self):
-        for p in self.photos_list:
-            p.b64_encode()
-
-        return self.get_deal_photos()
-
-    def clear_deal_photos(self):
-        self.photos_list.clear()
+        self.menu_step = MenuStep.UNSPECIFIED
 
     def clear_deal_data(self):
         self.deal_data = DealData()
-
-    def get_state(self):
-        return self._state
-
-    def set_digest(self, digest):
-        self._digest = digest
-
-    def get_digest(self):
-        return self._digest
-
-    def reset_state(self):
-        self.clear_deal_data()
-        self.clear_deal_photos()
-        self.set_state_menu()
