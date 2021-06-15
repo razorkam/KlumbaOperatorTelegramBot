@@ -28,6 +28,9 @@ def _stringify_field(field):
 
 
 def prepare_external_field(obj, key, lock=None, escape_md=True):
+    if not obj:
+        return Txt.FIELD_IS_EMPTY_PLACEHOLDER
+
     if lock:
         lock.acquire()
 

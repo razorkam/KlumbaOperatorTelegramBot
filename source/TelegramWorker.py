@@ -10,6 +10,7 @@ import source.cmd_handlers.Checklist2.TgHandlers as Checklist2
 import source.cmd_handlers.Courier3.TgHandlers as Courier3
 import source.cmd_handlers.Florist4.TgHandlers as Florist4
 import source.cmd_handlers.FloristOrder5.TgHandlers as FloristOrders5
+import source.cmd_handlers.SetAside6.TgHandlers as SetAside6
 
 import logging
 import os
@@ -39,7 +40,7 @@ def handle_password(update, context):
     return Starter.restart(update, context)
 
 
-def error_handler(update: Update, context):
+def error_handler(update, context: CallbackContext):
     try:
         logger.error(msg="Exception while handling Telegram update:", exc_info=context.error)
 
@@ -65,7 +66,8 @@ cv_handler = ConversationHandler(
                             Checklist2.cv_handler,
                             Courier3.cv_handler,
                             Florist4.cv_handler,
-                            FloristOrders5.cv_handler]  # all conv handlers here
+                            FloristOrders5.cv_handler,
+                            SetAside6.cv_handler]  # all conv handlers here
         },
         fallbacks=[CommandHandler([Cmd.START, Cmd.CANCEL], Starter.restart),
                    MessageHandler(Filters.all, Starter.global_fallback)],

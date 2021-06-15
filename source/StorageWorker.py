@@ -54,11 +54,11 @@ def check_authorization(user):
             login_col_name = BITRIX_USERS.columns[2]
             password_col_name = BITRIX_USERS.columns[4]
 
-            row = BITRIX_USERS.loc[(BITRIX_USERS[login_col_name] == user.bitrix_login) &
+            row = BITRIX_USERS.loc[(BITRIX_USERS[login_col_name].str.lower() == str(user.bitrix_login).lower()) &
                                    (BITRIX_USERS[password_col_name] == user.bitrix_password)]
 
             if not row.empty:
-                user.bitrix_user_id = int(row[id_col_name][0])  # authorized user ID
+                user.bitrix_user_id = int(row[id_col_name].iloc(0)[0])  # authorized user ID
                 return True
             else:
                 logger.error('Failed authorization attempt, login: %s, password: %s'

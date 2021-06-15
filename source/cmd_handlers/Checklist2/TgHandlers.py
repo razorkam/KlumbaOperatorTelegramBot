@@ -52,7 +52,7 @@ def deal_number_setting(update, context: CallbackContext):
     result, deal_data = GlobalBW.process_deal_info(update.message.text, True)
 
     if result == GlobalBW.BW_NO_SUCH_DEAL:
-        update.message.reply_markdown_v2(GlobalTxt.NO_SUCH_DEAL)
+        update.message.reply_markdown_v2(GlobalTxt.NO_SUCH_DEAL.format(deal_data.deal_id))
         return None
 
     if result == GlobalBW.BW_WRONG_STAGE:
@@ -152,7 +152,7 @@ cv_handler = ConversationHandler(
                                                          courier_skipping)],
         State.CHECKLIST_SETTING_PHOTO: [MessageHandler(Filters.photo, photo_setting)]
     },
-    fallbacks=[CommandHandler(Cmd.CANCEL, Starter.restart),
+    fallbacks=[CommandHandler([Cmd.START, Cmd.CANCEL], Starter.restart),
                MessageHandler(Filters.all, Starter.global_fallback)],
     map_to_parent={
         State.IN_MENU: State.IN_MENU,

@@ -42,11 +42,11 @@ def append_photo(update, context: CallbackContext):
     file_id_big = photo_big.file_id
     unique_id_big = photo_big.file_unique_id
     photo_content_big = photo_big.get_file().download_as_bytearray()
-    file_extension_small = photo_big.get_file().file_path.split('.')[-1]
+    file_extension_big = photo_big.get_file().file_path.split('.')[-1]
 
+    file_extension_small = photo_small.get_file().file_path.split('.')[-1]
     unique_id_small = photo_small.file_unique_id
     photo_content_small = photo_small.get_file().download_as_bytearray()
-    file_extension_big = photo_small.get_file().file_path.split('.')[-1]
 
     if photo_content_big and photo_content_small:
         # store raw photo data to save it on disk later
@@ -81,7 +81,7 @@ def update_deal(update, context: CallbackContext):
     deal_info = GlobalBW.get_deal(deal_id)
 
     if not deal_info:
-        update.message.reply_markdown_v2(GlobalTxt.NO_SUCH_DEAL)
+        update.message.reply_markdown_v2(GlobalTxt.NO_SUCH_DEAL.format(deal_id))
         return None
 
     saved = StorageHandlers.save_deal(user, update.message.text)

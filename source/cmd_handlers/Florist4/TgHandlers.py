@@ -66,7 +66,7 @@ def deal_number_setting(update, context: CallbackContext):
     result, deal_data = GlobalBW.process_deal_info(update.message.text, False)
 
     if result == GlobalBW.BW_NO_SUCH_DEAL:
-        update.message.reply_markdown_v2(GlobalTxt.NO_SUCH_DEAL)
+        update.message.reply_markdown_v2(GlobalTxt.NO_SUCH_DEAL.format(deal_data.deal_id))
         return None
 
     user.deal_data = deal_data
@@ -112,7 +112,7 @@ cv_handler = ConversationHandler(
             MessageHandler(Filters.regex(Txt.FLORIST_SETTING_COMMAND_PATTERN),
                            florist_setting)]
     },
-    fallbacks=[CommandHandler(Cmd.CANCEL, Starter.restart),
+    fallbacks=[CommandHandler([Cmd.START, Cmd.CANCEL], Starter.restart),
                MessageHandler(Filters.all, Starter.global_fallback)],
     map_to_parent={
         State.IN_MENU: State.IN_MENU,

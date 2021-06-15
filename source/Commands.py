@@ -10,6 +10,7 @@ CHECKLIST_LOAD = 'checklist'
 COURIER_SET = 'courier'
 FLORIST_SET = 'florist'
 FLORIST_ORDERS_LIST = 'florist_orders'
+SET_ASIDE = 'set_aside'
 
 # courier
 SET_COURIER_PREFIX = 'c'
@@ -24,3 +25,7 @@ EQUIP_ORDER_PREFIX = 'e'
 
 # utils commands
 FINISH = 'finish'
+
+
+# set aside
+WAITING_FOR_SUPPLY = 'waiting'

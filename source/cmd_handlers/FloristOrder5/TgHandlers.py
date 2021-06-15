@@ -174,7 +174,7 @@ cv_handler = ConversationHandler(
         State.LOADING_PHOTOS: [CommandHandler(Cmd.FINISH, PhotosLoading1.update_deal),
                                MessageHandler(Filters.photo, PhotosLoading1.append_photo)]
     },
-    fallbacks=[CommandHandler(Cmd.CANCEL, Starter.restart),
+    fallbacks=[CommandHandler([Cmd.START, Cmd.CANCEL], Starter.restart),
                MessageHandler(Filters.all, Starter.global_fallback)],
     map_to_parent={
         State.IN_MENU: State.IN_MENU,

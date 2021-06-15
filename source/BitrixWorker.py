@@ -179,18 +179,18 @@ def load_dicts():
 def process_deal_info(deal_id, check_approved=True):
     deal = get_deal(deal_id)
 
-    if not deal:
-        return BW_NO_SUCH_DEAL, None
-
-    if check_approved and deal[DEAL_STAGE_ALIAS] != DEAL_IS_IN_APPROVED_STAGE:
-        return BW_WRONG_STAGE, None
-
     deal_data = DealData()
     deal_data.deal_id = deal_id
 
+    if not deal:
+        return BW_NO_SUCH_DEAL, deal_data
+
+    if check_approved and deal[DEAL_STAGE_ALIAS] != DEAL_IS_IN_APPROVED_STAGE:
+        return BW_WRONG_STAGE, deal_data
+
     deal_data.order = Utils.prepare_external_field(deal, DEAL_ORDER_ALIAS)
 
-    contact_id = deal[DEAL_CONTACT_ALIAS]
+    contact_id = deal.get(DEAL_CONTACT_ALIAS)
     contact_data = send_request('crm.contact.get',
                                 {'id': contact_id})
 

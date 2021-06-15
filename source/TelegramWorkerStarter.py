@@ -19,7 +19,8 @@ def restart(update, context: CallbackContext):
                                                                         cmd.CHECKLIST_LOAD,
                                                                         cmd.COURIER_SET,
                                                                         cmd.FLORIST_SET,
-                                                                        Utils.escape_mdv2(cmd.FLORIST_ORDERS_LIST)))
+                                                                        Utils.escape_mdv2(cmd.FLORIST_ORDERS_LIST),
+                                                                        Utils.escape_mdv2(cmd.SET_ASIDE)))
             return State.IN_MENU
         else:  # authorization isn't valid now
             update.message.reply_markdown_v2(GlobalTxt.AUTHORIZATION_FAILED)
