@@ -197,7 +197,7 @@ def process_deal_info(deal_id, check_approved=True):
     contact_name = Utils.prepare_external_field(contact_data, CONTACT_USER_NAME_ALIAS)
     contact_phone = ''
 
-    if contact_data.get(CONTACT_HAS_PHONE_ALIAS) == CONTACT_HAS_PHONE:
+    if contact_data and contact_data.get(CONTACT_HAS_PHONE_ALIAS) == CONTACT_HAS_PHONE:
         contact_phone = Utils.prepare_external_field(contact_data[CONTACT_PHONE_ALIAS][0], 'VALUE')
 
     deal_data.contact = contact_name + ' ' + contact_phone

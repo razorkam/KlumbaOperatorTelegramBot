@@ -24,7 +24,7 @@ def process_deals(user: User):
     }
 
     deals = BW.send_request('crm.deal.list', params, handle_next=True)
-    user.florist_order_5.clear_deals()
+    user.florist_order_5.clear()
 
     for d in deals:
         deal = DealData()

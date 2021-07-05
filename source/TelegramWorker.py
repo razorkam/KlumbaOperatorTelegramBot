@@ -10,7 +10,7 @@ import source.cmd_handlers.Checklist2.TgHandlers as Checklist2
 import source.cmd_handlers.Courier3.TgHandlers as Courier3
 import source.cmd_handlers.Florist4.TgHandlers as Florist4
 import source.cmd_handlers.FloristOrder5.TgHandlers as FloristOrders5
-import source.cmd_handlers.SetAside6.TgHandlers as SetAside6
+import source.cmd_handlers.Reserve6.TgHandlers as Reserve6
 
 import logging
 import os
@@ -19,9 +19,7 @@ import traceback
 from telegram.ext import Updater, MessageHandler, Filters, PicklePersistence,\
     ConversationHandler, CommandHandler, CallbackContext
 
-from telegram import ParseMode
-
-from telegram import Update
+from telegram import ParseMode, Update
 
 
 logger = logging.getLogger(__name__)
@@ -67,7 +65,7 @@ cv_handler = ConversationHandler(
                             Courier3.cv_handler,
                             Florist4.cv_handler,
                             FloristOrders5.cv_handler,
-                            SetAside6.cv_handler]  # all conv handlers here
+                            Reserve6.cv_handler]  # all conv handlers here
         },
         fallbacks=[CommandHandler([Cmd.START, Cmd.CANCEL], Starter.restart),
                    MessageHandler(Filters.all, Starter.global_fallback)],

@@ -47,6 +47,7 @@
           - openpyxl
           - undecorated
           - pexpect
+          - python-telegram-bot
     - name: Copy workdir
       synchronize:
         src: '{{ playbook_dir }}'

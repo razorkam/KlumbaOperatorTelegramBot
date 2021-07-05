@@ -3,32 +3,6 @@ import typing
 
 # storing deal data while processing intermediate steps
 class DealData:
-    photo_data = None
-    photo_name = None
-    courier_id = None
-    courier = None
-    deal_id = None
-    order = None
-    contact = None
-    order_received_by = None
-    sum = None
-    total_sum = None
-    payment_type = None
-    payment_method = None
-    payment_status = None
-    prepaid = None
-    to_pay = None
-    incognito = None
-    order_comment = None
-    delivery_comment = None
-    florist_id = None
-    order_type_id = None
-    supply_type = None  # Доставка \ Самовывоз
-    postcard_text = None  # Текст открытки
-    time = None  # Дата
-    date = None  # Время
-    order_reserve = []  # Резерв товара (ссылки на фото)
-
     def __init__(self):
         self.photo_data = None
         self.photo_name = None
@@ -36,6 +10,7 @@ class DealData:
         self.courier_id = None
 
         self.deal_id = None
+        self.stage = None
         self.order = None
         self.contact = None
         self.order_received_by = None
@@ -57,4 +32,6 @@ class DealData:
         self.order_reserve = []
 
         self.florist_id = None
+        self.has_reserve = None
+        self.reserve_desc = None
 

@@ -5,7 +5,7 @@ import source.config as cfg
 from source.DealData import *
 from source.cmd_handlers.PhotosLoading1.UserData import UserData as PhotosLoading1UserData
 from source.cmd_handlers.FloristOrder5.UserData import UserData as FloristOrder5UserData
-from source.cmd_handlers.SetAside6.UserData import UserData as SetAside6UserData
+from source.cmd_handlers.Reserve6.UserData import UserData as Reserve6
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +34,12 @@ class State:
     FLORIST_ORDERS_LISTING = 11
     FLORIST_SELECTING_ORDER = 12
 
-    # set aside order - #6
-    SET_ASIDE_SETTING_DEAL_NUMBER = 13
-    SET_ASIDE_LOADING_PHOTOS = 14
+    # reserve order - #6
+    RESERVE_SETTING_DEAL_NUMBER = 13
+    RESERVE_WILL_YOU_RESERVE = 14
+    RESERVE_LOADING_PHOTOS = 15
+    RESERVE_SWITCHING_STAGE = 16
+    RESERVE_DESCRIPTION = 17
 
 
 class MenuStep:
@@ -46,7 +49,7 @@ class MenuStep:
     COURIER = 3
     FLORIST = 4
     FLORIST_ORDERS = 5
-    SET_ASIDE = 6
+    RESERVE = 6
 
 
 # setter decorator for Telegram callbacks only [Update, Context]
@@ -76,8 +79,8 @@ class User:
         self.photos_loading_1 = PhotosLoading1UserData()
         # step 5(florist orders listing)
         self.florist_order_5 = FloristOrder5UserData()
-        # step 6(set aside)
-        self.set_aside_6 = SetAside6UserData()
+        # step 6(reserve)
+        self.reserve6 = Reserve6()
 
         # description of 'checklist' or 'setting courier' menu step
         self.deal_data = DealData()

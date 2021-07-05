@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 def start_loading(update, context: CallbackContext):
     user: User = context.user_data.get(cfg.USER_PERSISTENT_KEY)
 
-    user.photos_loading_1.clear_deal_photos()
+    user.photos_loading_1.clear()
     update.message.reply_markdown_v2(Txt.ASK_FOR_PHOTO_TEXT)
     return State.LOADING_PHOTOS
 
@@ -68,7 +68,7 @@ def append_photo(update, context: CallbackContext):
 def update_deal(update, context: CallbackContext):
     user: User = context.user_data.get(cfg.USER_PERSISTENT_KEY)
 
-    if not user.photos_loading_1.photos_list:
+    if not user.photos_loading_1.photos:
         msg_text = Txt.NO_PHOTOS_TEXT if user.menu_step == MenuStep.PHOTOS else FloristOrdersTxt.NO_PHOTOS_TEXT
         update.message.reply_markdown_v2(msg_text)
         return None
@@ -100,6 +100,7 @@ def update_deal(update, context: CallbackContext):
         return None
     else:  # OK
         update.message.reply_markdown_v2(GlobalTxt.DEAL_UPDATED)
+        user.photos_loading_1.clear()
         return Starter.restart(update, context)
 
 

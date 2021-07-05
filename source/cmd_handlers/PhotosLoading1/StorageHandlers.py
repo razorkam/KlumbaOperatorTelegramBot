@@ -35,7 +35,7 @@ def init_db():
 
 def save_deal(user: User, deal_id):
     try:
-        photos = user.photos_loading_1.photos_list
+        photos = user.photos_loading_1.photos
 
         order_digest = ''
         all_is_on_disk = True

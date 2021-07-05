@@ -1,4 +1,5 @@
-from telegram.ext import CallbackContext, ConversationHandler
+from telegram.ext import CallbackContext
+from telegram import ParseMode
 
 import source.config as cfg
 import source.Commands as cmd
@@ -15,23 +16,25 @@ def restart(update, context: CallbackContext):
     # has user been already cached?
     if user:
         if StorageWorker.check_authorization(user):
-            update.message.reply_markdown_v2(GlobalTxt.MENU_TEXT.format(cmd.PHOTO_LOAD,
-                                                                        cmd.CHECKLIST_LOAD,
-                                                                        cmd.COURIER_SET,
-                                                                        cmd.FLORIST_SET,
-                                                                        Utils.escape_mdv2(cmd.FLORIST_ORDERS_LIST),
-                                                                        Utils.escape_mdv2(cmd.SET_ASIDE)))
+            update.effective_user.send_message(text=GlobalTxt.MENU_TEXT.format(cmd.RESERVE,
+                                                                               cmd.FLORIST_SET,
+                                                                               cmd.PHOTO_LOAD,
+                                                                               cmd.CHECKLIST_LOAD,
+                                                                               Utils.escape_mdv2(cmd.COURIER_SET),
+                                                                               Utils.escape_mdv2(cmd.FLORIST_ORDERS_LIST)),
+                                               parse_mode=ParseMode.MARKDOWN_V2)
+
             return State.IN_MENU
         else:  # authorization isn't valid now
-            update.message.reply_markdown_v2(GlobalTxt.AUTHORIZATION_FAILED)
+            update.effective_user.send_message(text=GlobalTxt.AUTHORIZATION_FAILED, parse_mode=ParseMode.MARKDOWN_V2)
             return State.LOGIN_REQUESTED
 
     else:
-        update.message.reply_markdown_v2(GlobalTxt.REQUEST_LOGIN_MESSAGE)
+        update.effective_user.send_message(text=GlobalTxt.REQUEST_LOGIN_MESSAGE, parse_mode=ParseMode.MARKDOWN_V2)
         context.user_data[cfg.USER_PERSISTENT_KEY] = User()
         return State.LOGIN_REQUESTED
 
 
 def global_fallback(update, context: CallbackContext):
-    update.message.reply_markdown_v2(GlobalTxt.UNKNOWN_COMMAND)
+    update.effective_user.send_message(text=GlobalTxt.UNKNOWN_COMMAND, parse_mode=ParseMode.MARKDOWN_V2)
     return None  # don't change actual conversation state
