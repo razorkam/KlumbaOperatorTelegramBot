@@ -1,5 +1,6 @@
 from typing import List
 import logging
+import pathlib
 
 from telegram.ext import MessageHandler, Filters, CallbackContext, \
     ConversationHandler, CommandHandler, CallbackQueryHandler
@@ -129,6 +130,14 @@ def switch_stage(update, context: CallbackContext):
     elif action == Txt.SWITCH_STAGE_PROCESSED_KEY:
         user.deal_data.stage = BitrixMappings.DEAL_RESERVED_STAGE
         user.deal_data.reserve_desc = Txt.NO_RESERVE_NEEDED_STUB
+
+        photo_stub_name = 'no_reserve_needed.png'
+        photo_stub_path = pathlib.Path(__file__).parent.resolve() / 'data' / photo_stub_name
+
+        with open(photo_stub_path, 'rb') as f:
+            stub_bytes = f.read()
+            user.reserve6.add_deal_photo(Photo(photo_stub_name,
+                                               stub_bytes))
 
     user.deal_data.has_reserve = BitrixMappings.DEAL_HAS_RESERVE_NO
 

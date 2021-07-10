@@ -34,3 +34,6 @@ FLORIST_POSITION_ID = '2343'  # Флорист
 # has reserve
 DEAL_HAS_RESERVE_YES = '2551'
 DEAL_HAS_RESERVE_NO = '2553'
+
+# has postcard
+DEAL_HAS_POSTCARD_YES = '2543'
