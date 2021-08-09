@@ -6,7 +6,7 @@ from telegram.ext import MessageHandler, Filters, CallbackContext, \
 from source.User import State, User, MenuStep, menu_step_entry
 import source.Commands as Cmd
 import source.config as cfg
-import source.Utils as Utils
+import source.utils.Utils as Utils
 import source.TelegramWorkerStarter as Starter
 import source.TextSnippets as GlobalTxt
 import source.BitrixWorker as GlobalBW

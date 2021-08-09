@@ -1,16 +1,12 @@
-from typing import List
 import logging
-import base64
 
 from telegram.ext import MessageHandler, Filters, CallbackContext, \
     ConversationHandler, CommandHandler
 
-from telegram import PhotoSize
-
 from source.User import State, User, MenuStep, menu_step_entry
 import source.Commands as Cmd
 import source.config as cfg
-import source.Utils as Utils
+import source.utils.Utils as Utils
 import source.TelegramWorkerStarter as Starter
 import source.TextSnippets as GlobalTxt
 import source.BitrixWorker as GlobalBW
@@ -38,7 +34,7 @@ def generate_courier_suggestions(user):
             if courier_id != ck:
                 suggestions += Txt.COURIER_TEMPLATE.format(Utils.escape_mdv2(cv),
                                                            Utils.escape_mdv2(Cmd.CMD_PREFIX + Cmd.SET_COURIER_PREFIX +
-                                                           Cmd.CMD_DELIMETER + ck))
+                                                                             Cmd.CMD_DELIMETER + ck))
 
         return suggestions
 

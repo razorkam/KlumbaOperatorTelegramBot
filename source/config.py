@@ -1,8 +1,8 @@
 import logging
 
 # dirs
-DATA_DIR_NAME = '/home/.klumba_operator_bot'
-# DATA_DIR_NAME = '/home/.klumba_operator_bot_test'  # test env
+# DATA_DIR_NAME = '/home/.klumba_operator_bot'
+DATA_DIR_NAME = '/home/.klumba_operator_bot_test'  # test env
 ORDERS_DIR_NAME = 'orders_data'
 
 # Telegram bot persistent storage

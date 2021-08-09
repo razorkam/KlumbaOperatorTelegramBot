@@ -1,6 +1,6 @@
 import logging
 
-from source import Utils
+from source.utils import Utils
 import source.BitrixWorker as BW
 from source.BitrixFieldsAliases import *
 from source.BitrixFieldMappings import *

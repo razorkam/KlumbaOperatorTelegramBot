@@ -2,7 +2,7 @@ import requests
 from threading import Lock
 
 import source.creds as creds
-import source.Utils as Utils
+import source.utils.Utils as Utils
 
 from source.BitrixFieldsAliases import *
 from source.BitrixFieldMappings import *

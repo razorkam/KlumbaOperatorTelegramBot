@@ -13,6 +13,7 @@
           - nginx
           - uwsgi
           - uwsgi-plugin-python3
+          - language-pack-ru
         state: latest
     - name: Uninstall OS-level Certbot packages
       apt:

@@ -18,7 +18,8 @@ def update_deal_reserve(user: User):
     update_obj = {'id': deal_id, 'fields': {DEAL_ORDER_RESERVE_ALIAS: [],
                                             DEAL_STAGE_ALIAS: user.deal_data.stage,
                                             DEAL_ORDER_RESERVE_DESC_ALIAS: user.deal_data.reserve_desc,
-                                            DEAL_ORDER_HAS_RESERVE_ALIAS: user.deal_data.has_reserve}}
+                                            DEAL_ORDER_HAS_RESERVE_ALIAS: user.deal_data.has_reserve,
+                                            DEAL_SUPPLY_DATETIME_ALIAS: user.deal_data.supply_datetime}}
 
     for photo in photos_list:
         update_obj['fields'][DEAL_ORDER_RESERVE_ALIAS].append({'fileData': [photo.name_big,

@@ -28,6 +28,7 @@ SWITCH_STAGE_PROCESSED_KEY = 'reserve_processed'
 SWITCH_STAGE_CB_PATTERN = '^' + SWITCH_STAGE_WAITING_FOR_SUPPLY_KEY + '$|^' + SWITCH_STAGE_PROCESSED_KEY + '$'
 
 REQUEST_DESCRIPTION = 'Введите текстовое описание отложенного:\n' + GlobalTxt.SUGGEST_CANCEL_TEXT
+CALENDAR_DESCRIPTION = 'Выберите дату, затем время поставки:\n' + GlobalTxt.SUGGEST_CANCEL_TEXT
 
 NO_RESERVE_NEEDED_STUB = 'Резерв не нужен'
 

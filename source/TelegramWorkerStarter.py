@@ -4,7 +4,7 @@ from telegram import ParseMode
 import source.config as cfg
 import source.Commands as cmd
 import source.TextSnippets as GlobalTxt
-import source.Utils as Utils
+import source.utils.Utils as Utils
 import source.StorageWorker as StorageWorker
 from source.User import User, State, MenuStep, menu_step_entry
 

@@ -1,14 +1,12 @@
 import logging
 
 import source.BitrixWorker as BW
-import source.Utils as Utils
+import source.utils.Utils as Utils
 from source.BitrixFieldsAliases import *
 from source.BitrixFieldMappings import *
 from source.client_backend.JsonKeys import *
 from source.client_backend.ClientDealDesc import ClientDealDesc
 from source.client_backend.ClientTextSnippets import *
-from source.TextSnippets import *
-
 
 logger = logging.getLogger(__name__)
 

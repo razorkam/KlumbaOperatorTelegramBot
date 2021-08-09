@@ -34,4 +34,6 @@ class DealData:
         self.florist_id = None
         self.has_reserve = None
         self.reserve_desc = None
+        self.supply_datetime = None
+
 

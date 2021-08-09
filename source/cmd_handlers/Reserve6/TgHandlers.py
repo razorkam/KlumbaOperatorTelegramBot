@@ -14,6 +14,8 @@ import source.TelegramWorkerStarter as Starter
 import source.TextSnippets as GlobalTxt
 import source.BitrixWorker as GlobalBW
 import source.BitrixFieldMappings as BitrixMappings
+import source.utils.TelegramCalendar as TgCalendar
+
 
 from . import TextSnippets as Txt
 from .Photo import Photo as Photo
@@ -125,11 +127,17 @@ def switch_stage(update, context: CallbackContext):
     action = update.callback_query.data
 
     if action == Txt.SWITCH_STAGE_WAITING_FOR_SUPPLY_KEY:
-        user.deal_data.stage = BitrixMappings.DEAL_WAITING_FOR_SUPPLY_STAGE
-        user.deal_data.reserve_desc = None
+        calendar_markup = TgCalendar.create_calendar()
+        update.effective_user.send_message(text=Txt.CALENDAR_DESCRIPTION,
+                                           parse_mode=ParseMode.MARKDOWN_V2,
+                                           reply_markup=calendar_markup)
+
+        return State.RESERVE_SUPPLY_CALENDAR
     elif action == Txt.SWITCH_STAGE_PROCESSED_KEY:
         user.deal_data.stage = BitrixMappings.DEAL_RESERVED_STAGE
         user.deal_data.reserve_desc = Txt.NO_RESERVE_NEEDED_STUB
+        user.deal_data.has_reserve = BitrixMappings.DEAL_HAS_RESERVE_NO
+        user.deal_data.supply_datetime = None
 
         photo_stub_name = 'no_reserve_needed.png'
         photo_stub_path = pathlib.Path(__file__).parent.resolve() / 'data' / photo_stub_name
@@ -138,8 +146,6 @@ def switch_stage(update, context: CallbackContext):
             stub_bytes = f.read()
             user.reserve6.add_deal_photo(Photo(photo_stub_name,
                                                stub_bytes))
-
-    user.deal_data.has_reserve = BitrixMappings.DEAL_HAS_RESERVE_NO
 
     result = BitrixHandlers.update_deal_reserve(user)
 
@@ -150,6 +156,29 @@ def switch_stage(update, context: CallbackContext):
         update.effective_user.send_message(text=GlobalTxt.DEAL_UPDATED, parse_mode=ParseMode.MARKDOWN_V2)
         user.reserve6.clear()
         return Starter.restart(update, context)
+
+
+def calendar_selection(update, context: CallbackContext):
+    update.callback_query.answer()
+    user: User = context.user_data.get(cfg.USER_PERSISTENT_KEY)
+
+    result, dt = TgCalendar.process_calendar_selection(update, context)
+
+    if result:
+        user.deal_data.stage = BitrixMappings.DEAL_WAITING_FOR_SUPPLY_STAGE
+        user.deal_data.reserve_desc = None
+        user.deal_data.supply_datetime = dt.isoformat()
+        user.deal_data.has_reserve = BitrixMappings.DEAL_HAS_RESERVE_NO
+
+        res = BitrixHandlers.update_deal_reserve(user)
+
+        if res == BitrixHandlers.BH_INTERNAL_ERROR:
+            update.effective_user.send_message(text=GlobalTxt.ERROR_BITRIX_REQUEST, parse_mode=ParseMode.MARKDOWN_V2)
+            return None
+        else:  # OK
+            update.effective_user.send_message(text=GlobalTxt.DEAL_UPDATED, parse_mode=ParseMode.MARKDOWN_V2)
+            user.reserve6.clear()
+            return Starter.restart(update, context)
 
 
 cv_handler = ConversationHandler(
@@ -163,7 +192,9 @@ cv_handler = ConversationHandler(
                                        MessageHandler(Filters.photo, append_photo)],
         State.RESERVE_DESCRIPTION: [MessageHandler(Filters.text, set_description)],
         State.RESERVE_SWITCHING_STAGE: [CallbackQueryHandler(callback=switch_stage,
-                                                             pattern=Txt.SWITCH_STAGE_CB_PATTERN)]
+                                                             pattern=Txt.SWITCH_STAGE_CB_PATTERN)],
+        State.RESERVE_SUPPLY_CALENDAR: [CallbackQueryHandler(callback=calendar_selection,
+                                                             pattern=TgCalendar.PATTERN)]
     },
     fallbacks=[CommandHandler(Cmd.CANCEL, Starter.restart),
                MessageHandler(Filters.all, Starter.global_fallback)],
