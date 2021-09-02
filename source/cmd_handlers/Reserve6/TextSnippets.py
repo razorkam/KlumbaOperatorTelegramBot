@@ -23,12 +23,14 @@ RESERVE_CB_PATTERN = '^' + RESERVE_YES_KEY + '$|^' + RESERVE_NO_KEY + '$'
 SWITCH_STAGE = 'Переведите заказ в одну из стадий:\n' + GlobalTxt.SUGGEST_CANCEL_TEXT
 SWITCH_STAGE_WAITING_FOR_SUPPLY_TXT = 'Ждет поставки'
 SWITCH_STAGE_WAITING_FOR_SUPPLY_KEY = 'reserve_waiting_for_supply'
-SWITCH_STAGE_PROCESSED_TXT = 'Обработан'
+SWITCH_STAGE_PROCESSED_TXT = 'Обработан (резерв не нужен)'
 SWITCH_STAGE_PROCESSED_KEY = 'reserve_processed'
 SWITCH_STAGE_CB_PATTERN = '^' + SWITCH_STAGE_WAITING_FOR_SUPPLY_KEY + '$|^' + SWITCH_STAGE_PROCESSED_KEY + '$'
 
 REQUEST_DESCRIPTION = 'Введите текстовое описание отложенного:\n' + GlobalTxt.SUGGEST_CANCEL_TEXT
 CALENDAR_DESCRIPTION = 'Выберите дату, затем время поставки:\n' + GlobalTxt.SUGGEST_CANCEL_TEXT
+DATE_TOO_EARLY = 'Дата поставки должна быть позже текущей!\n' \
+                 'Попробуйте снова.'
 
 NO_RESERVE_NEEDED_STUB = 'Резерв не нужен'
 

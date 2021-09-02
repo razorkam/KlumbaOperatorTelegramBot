@@ -19,7 +19,7 @@ def process_deals(user: User):
         'filter': {DEAL_FLORIST_NEW_ALIAS: user.bitrix_user_id,
                    DEAL_STAGE_ALIAS: DEAL_FLORIST_STAGE},
         'select': [DEAL_ID_ALIAS, DEAL_SUPPLY_METHOD_ALIAS, DEAL_ORDER_ALIAS, DEAL_ORDER_COMMENT_ALIAS,
-                   DEAL_POSTCARD_TEXT_ALIAS, DEAL_SUM_ALIAS, DEAL_DATE_ALIAS, DEAL_TIME_ALIAS,
+                   DEAL_POSTCARD_TEXT_ALIAS, DEAL_TOTAL_SUM_ALIAS, DEAL_DATE_ALIAS, DEAL_TIME_ALIAS,
                    DEAL_ORDER_RESERVE_ALIAS]
     }
 
@@ -33,7 +33,7 @@ def process_deals(user: User):
         deal.order = Utils.prepare_external_field(d, DEAL_ORDER_ALIAS)
         deal.order_comment = Utils.prepare_external_field(d, DEAL_ORDER_COMMENT_ALIAS)
         deal.postcard_text = Utils.prepare_external_field(d, DEAL_POSTCARD_TEXT_ALIAS)
-        deal.sum = Utils.prepare_external_field(d, DEAL_SUM_ALIAS)
+        deal.sum = Utils.prepare_external_field(d, DEAL_TOTAL_SUM_ALIAS)
         deal.date = Utils.prepare_deal_date(d, DEAL_DATE_ALIAS)
         deal.time = Utils.prepare_deal_time(d, DEAL_TIME_ALIAS)
         deal.order_reserve = [el['downloadUrl'] for el in d.get(DEAL_ORDER_RESERVE_ALIAS)]  # only links list for now

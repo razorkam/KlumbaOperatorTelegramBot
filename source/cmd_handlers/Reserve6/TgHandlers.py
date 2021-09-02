@@ -1,6 +1,7 @@
 from typing import List
 import logging
 import pathlib
+import datetime
 
 from telegram.ext import MessageHandler, Filters, CallbackContext, \
     ConversationHandler, CommandHandler, CallbackQueryHandler
@@ -159,12 +160,22 @@ def switch_stage(update, context: CallbackContext):
 
 
 def calendar_selection(update, context: CallbackContext):
-    update.callback_query.answer()
+    query = update.callback_query
     user: User = context.user_data.get(cfg.USER_PERSISTENT_KEY)
 
     result, dt = TgCalendar.process_calendar_selection(update, context)
 
     if result:
+        if dt < datetime.datetime.now():
+            query.answer(text=Txt.DATE_TOO_EARLY)
+            context.bot.edit_message_text(text=query.message.text,
+                                          chat_id=query.message.chat_id,
+                                          message_id=query.message.message_id,
+                                          reply_markup=TgCalendar.create_calendar())
+
+            return None
+
+        query.answer()
         user.deal_data.stage = BitrixMappings.DEAL_WAITING_FOR_SUPPLY_STAGE
         user.deal_data.reserve_desc = None
         user.deal_data.supply_datetime = dt.isoformat()
@@ -179,6 +190,8 @@ def calendar_selection(update, context: CallbackContext):
             update.effective_user.send_message(text=GlobalTxt.DEAL_UPDATED, parse_mode=ParseMode.MARKDOWN_V2)
             user.reserve6.clear()
             return Starter.restart(update, context)
+
+    query.answer()
 
 
 cv_handler = ConversationHandler(

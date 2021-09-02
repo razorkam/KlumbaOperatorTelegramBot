@@ -12,6 +12,7 @@ class UserData:
 
     def clear(self):
         self.photos.clear()
+        self.digest = str()
 
     def encode_deal_photos(self):
         for p in self.photos:

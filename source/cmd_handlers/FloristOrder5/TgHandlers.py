@@ -16,7 +16,9 @@ import source.creds as creds
 from . import TextSnippets as Txt
 from . import BitrixHandlers as BitrixHandlers
 
+import source.cmd_handlers.PhotosLoading1.BitrixHandlers as PhotosBH
 import source.cmd_handlers.PhotosLoading1.TgHandlers as PhotosLoading1
+import source.cmd_handlers.PhotosLoading1.TextSnippets as PhotosTxt
 
 logger = logging.getLogger(__name__)
 
@@ -138,12 +140,19 @@ def get_deals(update: Update, context: CallbackContext):
     return State.FLORIST_SELECTING_ORDER
 
 
-def equip_deal(update: Update, context: CallbackContext):
+def equip_deal(update, context):
     user: User = context.user_data.get(cfg.USER_PERSISTENT_KEY)
     deal_id = context.match.group(1)
+    result = PhotosBH.set_deal_number(user, deal_id)
 
-    user.deal_data.deal_id = deal_id
-    return undecorated(PhotosLoading1.start_loading)(update, context)
+    if result == GlobalBW.BW_NO_SUCH_DEAL:
+        update.message.reply_markdown_v2(GlobalTxt.NO_SUCH_DEAL.format(deal_id))
+        return None
+
+    update.message.reply_markdown_v2(PhotosTxt.ASK_FOR_PHOTO_TEXT)
+
+    user._state = State.SETUP_PHOTOS
+    return user._state
 
 
 def switch_deal(update: Update, context: CallbackContext):
@@ -171,8 +180,12 @@ cv_handler = ConversationHandler(
         State.FLORIST_SELECTING_ORDER: [MessageHandler(Filters.regex(Txt.EQUIP_ORDER_COMMAND_PATTERN), equip_deal),
                                         CallbackQueryHandler(callback=switch_deal,
                                                              pattern=Txt.SWITCH_ORDER_CB_PATTERN)],
-        State.LOADING_PHOTOS: [CommandHandler(Cmd.FINISH, PhotosLoading1.update_deal),
-                               MessageHandler(Filters.photo, PhotosLoading1.append_photo)]
+        State.SETUP_PHOTOS: [MessageHandler(Filters.photo, PhotosLoading1.append_photo),
+                             CallbackQueryHandler(callback=PhotosLoading1.finish_photo_loading,
+                                                  pattern=PhotosTxt.FINISH_PHOTO_LOADING_PATTERN)],
+        State.SETUP_POSTCARD: [MessageHandler(Filters.photo, PhotosLoading1.append_photo),
+                               CallbackQueryHandler(callback=PhotosLoading1.finish_postcard_loading,
+                                                    pattern=PhotosTxt.FINISH_POSTCARD_LOADING_PATTERN)]
     },
     fallbacks=[CommandHandler([Cmd.START, Cmd.CANCEL], Starter.restart),
                MessageHandler(Filters.all, Starter.global_fallback)],

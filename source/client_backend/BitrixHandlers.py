@@ -30,7 +30,7 @@ def get_deal_info_for_client(deal_id):
         deal_desc.date = Utils.prepare_deal_date(deal, DEAL_DATE_ALIAS, escape_md=False)
         deal_desc.time = Utils.prepare_deal_time(deal, DEAL_TIME_ALIAS, escape_md=False)
         deal_desc.sum = Utils.prepare_external_field(deal, DEAL_TOTAL_SUM_ALIAS, escape_md=False)
-        deal_desc.to_pay = Utils.prepare_external_field(deal, DEAL_SUM_ALIAS, escape_md=False)
+        deal_desc.to_pay = Utils.prepare_external_field(deal, DEAL_TO_PAY_ALIAS, escape_md=False)
         deal_desc.flat = Utils.prepare_external_field(deal, DEAL_FLAT_ALIAS, escape_md=False)
 
         deal_desc.incognito = Utils.prepare_deal_incognito_client(deal, DEAL_INCOGNITO_ALIAS)

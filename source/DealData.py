@@ -26,6 +26,7 @@ class DealData:
         self.delivery_comment = None
         self.order_type_id = None
         self.supply_type = None
+        self.has_postcard = None
         self.postcard_text = None
         self.time = None
         self.date = None

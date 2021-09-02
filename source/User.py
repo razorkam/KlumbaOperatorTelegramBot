@@ -14,33 +14,36 @@ class State:
     LOGIN_REQUESTED = 0
     PASSWORD_REQUESTED = 1
     IN_MENU = 2  # user is in menu - #1
+
     # flowers photos
-    LOADING_PHOTOS = 3
+    SETUP_DEAL_NUMBER = 3
+    SETUP_PHOTOS = 4
+    SETUP_POSTCARD = 5
 
     # checklist loading actions - #2
-    CHECKLIST_SETTING_DEAL_NUMBER = 4
-    CHECKLIST_SETTING_COURIER = 5
-    CHECKLIST_SETTING_PHOTO = 6
+    CHECKLIST_SETTING_DEAL_NUMBER = 6
+    CHECKLIST_SETTING_COURIER = 7
+    CHECKLIST_SETTING_PHOTO = 8
 
     # setting courier on any deal stage - #3
-    SETTING_COURIER_DEAL_NUMBER = 7
-    SETTING_COURIER_COURIER_CHOOSE = 8
+    SETTING_COURIER_DEAL_NUMBER = 9
+    SETTING_COURIER_COURIER_CHOOSE = 10
 
     # florist setting - # 4
-    SETTING_FLORIST_DEAL_NUMBER = 9
-    SETTING_FLORIST_FLORIST_CHOOSE = 10
+    SETTING_FLORIST_DEAL_NUMBER = 11
+    SETTING_FLORIST_FLORIST_CHOOSE = 12
 
     # florist operations - # 5
-    FLORIST_ORDERS_LISTING = 11
-    FLORIST_SELECTING_ORDER = 12
+    FLORIST_ORDERS_LISTING = 13
+    FLORIST_SELECTING_ORDER = 14
 
     # reserve order - #6
-    RESERVE_SETTING_DEAL_NUMBER = 13
-    RESERVE_WILL_YOU_RESERVE = 14
-    RESERVE_LOADING_PHOTOS = 15
-    RESERVE_SWITCHING_STAGE = 16
-    RESERVE_DESCRIPTION = 17
-    RESERVE_SUPPLY_CALENDAR = 18
+    RESERVE_SETTING_DEAL_NUMBER = 15
+    RESERVE_WILL_YOU_RESERVE = 16
+    RESERVE_LOADING_PHOTOS = 17
+    RESERVE_SWITCHING_STAGE = 18
+    RESERVE_DESCRIPTION = 19
+    RESERVE_SUPPLY_CALENDAR = 20
 
 
 class MenuStep:
@@ -83,7 +86,7 @@ class User:
         # step 6(reserve)
         self.reserve6 = Reserve6()
 
-        # description of 'checklist' or 'setting courier' menu step
+        # deal description
         self.deal_data = DealData()
 
         self.menu_step = MenuStep.UNSPECIFIED

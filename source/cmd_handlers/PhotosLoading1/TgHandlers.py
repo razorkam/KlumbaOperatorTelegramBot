@@ -2,20 +2,20 @@ from typing import List
 import logging
 
 from telegram.ext import MessageHandler, Filters, CallbackContext, \
-    ConversationHandler, CommandHandler
+    ConversationHandler, CommandHandler, CallbackQueryHandler
 
-from telegram import PhotoSize
+from telegram import PhotoSize, InlineKeyboardMarkup, InlineKeyboardButton, Update, ParseMode
 
 from source.User import State, User, MenuStep, menu_step_entry
 import source.Commands as Cmd
 import source.config as cfg
 import source.TelegramWorkerStarter as Starter
 import source.TextSnippets as GlobalTxt
-import source.cmd_handlers.FloristOrder5.TextSnippets as FloristOrdersTxt
-import source.BitrixWorker as GlobalBW
+import source.BitrixWorker as BW
 
 from . import TextSnippets as Txt
 from .Photo import Photo as Photo
+from . import BitrixHandlers as BH
 from . import StorageHandlers as StorageHandlers
 from . import BitrixHandlers as BitrixHandlers
 
@@ -23,12 +23,28 @@ logger = logging.getLogger(__name__)
 
 
 @menu_step_entry(MenuStep.PHOTOS)
-def start_loading(update, context: CallbackContext):
+def request_deal_number(update, context: CallbackContext):
     user: User = context.user_data.get(cfg.USER_PERSISTENT_KEY)
 
     user.photos_loading_1.clear()
+    update.message.reply_markdown_v2(Txt.ASK_FOR_DEAL_NUMBER)
+    return State.SETUP_DEAL_NUMBER
+
+
+def set_deal_number(update, context: CallbackContext):
+    user: User = context.user_data.get(cfg.USER_PERSISTENT_KEY)
+    deal_id = update.message.text
+
+    result = BH.set_deal_number(user, deal_id)
+
+    if result == BW.BW_NO_SUCH_DEAL:
+        update.message.reply_markdown_v2(GlobalTxt.NO_SUCH_DEAL.format(deal_id))
+        return None
+
     update.message.reply_markdown_v2(Txt.ASK_FOR_PHOTO_TEXT)
-    return State.LOADING_PHOTOS
+
+    user._state = State.SETUP_PHOTOS
+    return user._state
 
 
 def append_photo(update, context: CallbackContext):
@@ -37,7 +53,11 @@ def append_photo(update, context: CallbackContext):
     photos: List[PhotoSize] = update.message.photo
 
     photo_big = photos[-1]
-    photo_small = photos[0]
+
+    if len(photos) > 1:
+        photo_small = photos[1]
+    else:
+        photo_small = photos[0]
 
     file_id_big = photo_big.file_id
     unique_id_big = photo_big.file_unique_id
@@ -55,8 +75,14 @@ def append_photo(update, context: CallbackContext):
                                                    photo_content_small,
                                                    photo_content_big, file_id_big))
 
-        msg_text = Txt.PHOTO_LOADED_TEXT if user.menu_step == MenuStep.PHOTOS else FloristOrdersTxt.PHOTO_LOADED_TEXT
-        update.message.reply_markdown_v2(msg_text)
+        if user._state == State.SETUP_POSTCARD:
+            cbq = Txt.FINISH_POSTCARD_LOADING_CBQ
+        else:
+            cbq = Txt.FINISH_PHOTO_LOADING_CBQ
+
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(text=Txt.FINISH_PHOTO_LOADING,
+                                                               callback_data=cbq)]])
+        update.message.reply_markdown_v2(text=Txt.PHOTO_LOADED_TEXT, reply_markup=keyboard)
 
         logger.info('User id %s uploaded photo %s', update.message.from_user.id, unique_id_small)
     else:
@@ -65,50 +91,76 @@ def append_photo(update, context: CallbackContext):
     return None  # don't change state
 
 
-def update_deal(update, context: CallbackContext):
+def finish_photo_loading(update: Update, context: CallbackContext):
+    user: User = context.user_data.get(cfg.USER_PERSISTENT_KEY)
+    update.callback_query.answer()
+
+    if user.deal_data.has_postcard:
+        update.effective_user.send_message(text=Txt.DEAL_HAS_POSTCARD.format(user.deal_data.postcard_text),
+                                           parse_mode=ParseMode.MARKDOWN_V2)
+
+        user._state = State.SETUP_POSTCARD
+        return user._state
+    else:
+        return update_deal(update, context)
+
+
+def finish_postcard_loading(update: Update, context: CallbackContext):
+    update.callback_query.answer()
+
+    return update_deal(update, context)
+
+
+
+def update_deal(update: Update, context: CallbackContext):
     user: User = context.user_data.get(cfg.USER_PERSISTENT_KEY)
 
+    if user._state == State.SETUP_POSTCARD:
+        cbq = Txt.FINISH_POSTCARD_LOADING_CBQ
+    else:
+        cbq = Txt.FINISH_PHOTO_LOADING_CBQ
+
+    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(text=Txt.FINISH_PHOTO_LOADING,
+                                                           callback_data=cbq)]])
+
     if not user.photos_loading_1.photos:
-        msg_text = Txt.NO_PHOTOS_TEXT if user.menu_step == MenuStep.PHOTOS else FloristOrdersTxt.NO_PHOTOS_TEXT
-        update.message.reply_markdown_v2(msg_text)
+        update.effective_user.send_message(text=Txt.NO_PHOTOS_TEXT, parse_mode=ParseMode.MARKDOWN_V2,
+                                           reply_markup=keyboard)
         return None
 
-    if user.menu_step == MenuStep.PHOTOS:
-        deal_id = update.message.text
-    else:  # FloristOrder5
-        deal_id = user.deal_data.deal_id
-
-    deal_info = GlobalBW.get_deal(deal_id)
-
-    if not deal_info:
-        update.message.reply_markdown_v2(GlobalTxt.NO_SUCH_DEAL.format(deal_id))
-        return None
-
-    saved = StorageHandlers.save_deal(user, update.message.text)
+    saved = StorageHandlers.save_deal(user, user.deal_data.deal_id)
 
     if not saved:
-        update.message.reply_markdown_v2(GlobalTxt.UNKNOWN_ERROR)
+        update.effective_user.send_message(text=GlobalTxt.UNKNOWN_ERROR, parse_mode=ParseMode.MARKDOWN_V2,
+                                           reply_markup=keyboard)
         return None
 
-    result = BitrixHandlers.update_deal_image(user, deal_info)
+    result = BitrixHandlers.update_deal_image(user)
 
-    if result == BitrixHandlers.BH_WRONG_STAGE:
-        update.message.reply_markdown_v2(Txt.PHOTO_LOAD_WRONG_DEAL_STAGE)
+    if result == BW.BW_WRONG_STAGE:
+        update.effective_user.send_message(text=Txt.PHOTO_LOAD_WRONG_DEAL_STAGE, parse_mode=ParseMode.MARKDOWN_V2,
+                                           reply_markup=keyboard)
         return None
-    elif result == BitrixHandlers.BH_INTERNAL_ERROR:
-        update.message.reply_markdown_v2(GlobalTxt.ERROR_BITRIX_REQUEST)
+    elif result == BW.BW_INTERNAL_ERROR:
+        update.effective_user.send_message(text=GlobalTxt.ERROR_BITRIX_REQUEST, parse_mode=ParseMode.MARKDOWN_V2,
+                                           reply_markup=keyboard)
         return None
     else:  # OK
-        update.message.reply_markdown_v2(GlobalTxt.DEAL_UPDATED)
+        update.effective_user.send_message(text=GlobalTxt.DEAL_UPDATED, parse_mode=ParseMode.MARKDOWN_V2)
         user.photos_loading_1.clear()
         return Starter.restart(update, context)
 
 
 cv_handler = ConversationHandler(
-    entry_points=[CommandHandler(Cmd.PHOTO_LOAD, start_loading)],
+    entry_points=[CommandHandler(Cmd.PHOTO_LOAD, request_deal_number)],
     states={
-        State.LOADING_PHOTOS: [MessageHandler(Filters.regex(GlobalTxt.BITRIX_DEAL_NUMBER_PATTERN), update_deal),
-                               MessageHandler(Filters.photo, append_photo)],
+        State.SETUP_DEAL_NUMBER: [MessageHandler(Filters.regex(GlobalTxt.BITRIX_DEAL_NUMBER_PATTERN), set_deal_number)],
+        State.SETUP_PHOTOS: [MessageHandler(Filters.photo, append_photo),
+                             CallbackQueryHandler(callback=finish_photo_loading,
+                                                  pattern=Txt.FINISH_PHOTO_LOADING_PATTERN)],
+        State.SETUP_POSTCARD: [MessageHandler(Filters.photo, append_photo),
+                               CallbackQueryHandler(callback=finish_postcard_loading,
+                                                    pattern=Txt.FINISH_POSTCARD_LOADING_PATTERN)]
     },
     fallbacks=[CommandHandler(Cmd.CANCEL, Starter.restart),
                MessageHandler(Filters.all, Starter.global_fallback)],
