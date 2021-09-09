@@ -89,16 +89,16 @@ def maintain_storage():
     load_bitrix_dicts()
 
     schedule.every().day.at(Photos1.ORDERS_CLEANUP_TIME).do(Photos1.orders_cleanup_job)
-    schedule.every().hour.do(download_bitrix_creds)
-    schedule.every().hour.do(load_bitrix_dicts)
+    schedule.every(10).minutes.do(download_bitrix_creds)
+    schedule.every(10).minutes.do(load_bitrix_dicts)
 
     def thread_fun():
-        try:
-            while True:
+        while True:
+            try:
                 schedule.run_pending()
                 time.sleep(SCHEDULING_SLEEP_INTERVAL)
-        except Exception as e:
-            logger.error("Scheduler thread error: %s", e)
+            except Exception as e:
+                logger.error("Scheduler thread error: %s", e)
 
     thread = Thread(target=thread_fun, daemon=True)
     thread.start()
