@@ -22,7 +22,7 @@ def get_deal_info_for_client(deal_id):
         stage = deal[DEAL_STAGE_ALIAS]
 
         deal_desc = ClientDealDesc()
-        deal_desc.agreed = (stage != DEAL_IS_EQUIPPED_STAGE)
+        deal_desc.agreed = (stage != DEAL_IS_EQUIPPED_STATUS_ID)
 
         address, location = Utils.prepare_deal_address(deal, DEAL_ADDRESS_ALIAS, escape_md=False)
         deal_desc.address = address
@@ -33,7 +33,7 @@ def get_deal_info_for_client(deal_id):
         deal_desc.to_pay = Utils.prepare_external_field(deal, DEAL_TO_PAY_ALIAS, escape_md=False)
         deal_desc.flat = Utils.prepare_external_field(deal, DEAL_FLAT_ALIAS, escape_md=False)
 
-        deal_desc.incognito = Utils.prepare_deal_incognito_client(deal, DEAL_INCOGNITO_ALIAS)
+        deal_desc.incognito = Utils.prepare_deal_incognito_client_view(deal, DEAL_INCOGNITO_ALIAS)
 
     except Exception as e:
         logger.error('Error getting client deal info: %s', e)
@@ -52,7 +52,7 @@ def check_deal_stage_before_update(deal_id):
 
         stage = deal[DEAL_STAGE_ALIAS]
 
-        return stage == DEAL_IS_EQUIPPED_STAGE
+        return stage == DEAL_IS_EQUIPPED_STATUS_ID
 
     except Exception as e:
         logging.error("Exception getting contact data, %s", e)
@@ -67,7 +67,7 @@ def update_deal_by_client(deal_id, data):
 
         fields = {
             DEAL_CLIENT_COMMENT_ALIAS: comment,
-            DEAL_STAGE_ALIAS: DEAL_IS_IN_APPROVED_STAGE if approved else DEAL_IS_IN_UNAPPROVED_STAGE,
+            DEAL_STAGE_ALIAS: DEAL_APPROVED_STATUS_ID if approved else DEAL_UNAPPROVED_STATUS_ID,
             DEAL_CLIENT_CALLMEBACK_ALIAS: call_me_back,
             DEAL_COMMENT_APPROVED_ALIAS: DEAL_COMMENT_APPROVED_STUB if approved else None
         }

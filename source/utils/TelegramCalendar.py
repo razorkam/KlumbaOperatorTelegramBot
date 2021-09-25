@@ -1,6 +1,11 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import datetime
 import calendar
+import logging
+
+import source.config as cfg
+
+logger = logging.getLogger(__name__)
 
 TIMES_ROW_SIZE = 6
 TIMES_LIST = [
@@ -30,27 +35,31 @@ TIMES_LIST = [
     '23:00'
 ]
 
-PATTERN = '^.+$'
+DELIMETER = '_'
+CB_PREFIX = 'CAL'
+PATTERN = '^' + CB_PREFIX + DELIMETER + '.+$'
+TODAY_BUTTON_TEXT = 'Сегодня'
 
 
 class State:
     IGNORE = 'IGNORE'
     DAY = 'DAY'
     HOUR = 'HOUR'
-    PREV_MONTH = 'PREV_MONTH'
-    NEXT_MONTH = 'NEXT_MONTH'
+    PREV_MONTH = 'PREVMONTH'
+    NEXT_MONTH = 'NEXTMONTH'
+    TODAY = 'TODAY'
 
 
 def create_callback_data(action, year, month, day, hour):
-    return ";".join([action, str(year), str(month), str(day), str(hour)])
+    return CB_PREFIX + DELIMETER + DELIMETER.join([action, str(year), str(month), str(day), str(hour)])
 
 
 def separate_callback_data(data):
-    return data.split(";")
+    return data.split(DELIMETER)
 
 
 def create_calendar(year=None, month=None):
-    now = datetime.datetime.now()
+    now = datetime.datetime.now(tz=cfg.TIMEZONE)
     if year is None:
         year = now.year
     if month is None:
@@ -78,17 +87,23 @@ def create_calendar(year=None, month=None):
             if day == 0:
                 row.append(InlineKeyboardButton(" ", callback_data=data_ignore))
             else:
-                row.append(InlineKeyboardButton(str(day), callback_data=create_callback_data(State.DAY, year, month, day,
-                                                                                             0)))
+                row.append(InlineKeyboardButton(str(day), callback_data=create_callback_data(State.DAY, year, month,
+                                                                                             day, 0)))
         keyboard.append(row)
-    # Last row - Buttons
+
+    # Buttons
     row = [InlineKeyboardButton("<", callback_data=create_callback_data(State.PREV_MONTH, year, month, day, 0)),
            InlineKeyboardButton(" ", callback_data=data_ignore),
            InlineKeyboardButton(">", callback_data=create_callback_data(State.NEXT_MONTH, year, month, day, 0))]
 
     keyboard.append(row)
 
-    return InlineKeyboardMarkup(keyboard)
+    today = [InlineKeyboardButton(TODAY_BUTTON_TEXT,
+                                  callback_data=create_callback_data(State.TODAY, now.year, now.month, now.day, 0))]
+
+    keyboard.append(today)
+
+    return keyboard
 
 
 def create_timesheet(year, month, day):
@@ -108,39 +123,50 @@ def create_timesheet(year, month, day):
     return InlineKeyboardMarkup(keyboard)
 
 
-def process_calendar_selection(update, context):
+def process_calendar_selection(update, context, with_hours=True):
+    def day_handler(_query, _context, _with_hours, _year, _month, _day):
+        if _with_hours:
+            _context.bot.edit_message_text(text=_query.message.text,
+                                           chat_id=_query.message.chat_id,
+                                           message_id=_query.message.message_id,
+                                           reply_markup=create_timesheet(int(year), int(month), int(day))
+                                           )
+            return False, None
+        else:
+            return True, datetime.datetime(int(_year), int(_month), int(_day))
+
     ret_data = (False, None)
     query = update.callback_query
 
-    (action, year, month, day, hour) = separate_callback_data(query.data)
+    (prefix, action, year, month, day, hour) = separate_callback_data(query.data)
     curr = datetime.datetime(int(year), int(month), 1)
+
     if action == State.IGNORE:
-        context.bot.answer_callback_query(callback_query_id=query.id)
+        pass
     elif action == State.DAY:
-        context.bot.edit_message_text(text=query.message.text,
-                                      chat_id=query.message.chat_id,
-                                      message_id=query.message.message_id,
-                                      reply_markup=create_timesheet(int(year), int(month), int(day))
-                                      )
+        ret_data = day_handler(query, context, with_hours, year, month, day)
     elif action == State.HOUR:
-        context.bot.edit_message_text(text=query.message.text,
-                                      chat_id=query.message.chat_id,
-                                      message_id=query.message.message_id
-                                      )
-        ret_data = True, datetime.datetime(int(year), int(month), int(day), int(hour))
+        # context.bot.edit_message_text(text=query.message.text,
+        #                               chat_id=query.message.chat_id,
+        #                               message_id=query.message.message_id
+        #                               )
+        ret_data = True, datetime.datetime(int(year), int(month), int(day), int(hour), tzinfo=cfg.TIMEZONE)
     elif action == State.PREV_MONTH:
         pre = curr - datetime.timedelta(days=1)
         context.bot.edit_message_text(text=query.message.text,
                                       chat_id=query.message.chat_id,
                                       message_id=query.message.message_id,
-                                      reply_markup=create_calendar(int(pre.year), int(pre.month)))
+                                      reply_markup=InlineKeyboardMarkup(create_calendar(int(pre.year), int(pre.month))))
     elif action == State.NEXT_MONTH:
         ne = curr + datetime.timedelta(days=31)
         context.bot.edit_message_text(text=query.message.text,
                                       chat_id=query.message.chat_id,
                                       message_id=query.message.message_id,
-                                      reply_markup=create_calendar(int(ne.year), int(ne.month)))
+                                      reply_markup=InlineKeyboardMarkup(create_calendar(int(ne.year), int(ne.month))))
+
+    elif action == State.TODAY:
+        ret_data = day_handler(query, context, with_hours, year, month, day)
     else:
-        context.bot.answer_callback_query(callback_query_id=query.id, text="Something went wrong!")
-        # UNKNOWN
+        logger.error('Unknown calendar action: %s'), action
+
     return ret_data

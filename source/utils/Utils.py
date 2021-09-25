@@ -11,8 +11,21 @@ import source.TextSnippets as Txt
 ADDRESS_LINK_RESOLVING_SPECIAL_CHARS_PATTERN = re.compile('["]')
 BITRIX_ADDRESS_PATTERN = re.compile('(.+)\\|(\\d+\\.\\d+;\\d+\\.\\d+)')
 BITRIX_DATE_PATTERN = re.compile('(\\d{4})-(\\d{2})-(\\d{2}).*')
+PHONE_INVALID_SYMBOLS_LIST_PATTERN = re.compile('[^\\d]')
 
 BITRIX_DICTS_DB = local()
+
+# using only last PHONE_SIGNIFICANT_PART digits handling phone numbers
+PHONE_SIGNIFICANT_PART_SIZE = 10
+
+
+# remove all except digits to properly display in Tg clients
+# remove country code (one-char only)!
+def prepare_phone_number(phone):
+    if phone:
+        return re.sub(PHONE_INVALID_SYMBOLS_LIST_PATTERN, '', phone)[-PHONE_SIGNIFICANT_PART_SIZE:]
+
+    return ''
 
 
 # fully escape Markdownv2 string
@@ -20,11 +33,22 @@ def escape_mdv2(string):
     return tg_helpers.escape_markdown(text=string, version=2)
 
 
+# escape '()' part of markdown link definition
+def escape_mdv2_textlink(string):
+    return tg_helpers.escape_markdown(text=string, version=2, entity_type='text_link')
+
+
 def _stringify_field(field):
     if not bool(field):
         return Txt.FIELD_IS_EMPTY_PLACEHOLDER
     else:
         return str(field)
+
+
+def prepare_str(field, escape_md=True):
+    stringified = _stringify_field(field)
+
+    return escape_mdv2(stringified) if escape_md else stringified
 
 
 def prepare_external_field(obj, key, lock=None, escape_md=True):
@@ -42,8 +66,7 @@ def prepare_external_field(obj, key, lock=None, escape_md=True):
     if type(val) is list:
         val = ', '.join(val)
 
-    stringified = _stringify_field(val)
-    return escape_mdv2(stringified) if escape_md else stringified
+    return prepare_str(val, escape_md)
 
 
 def prepare_deal_address(obj, addrkey, escape_md=True):
@@ -89,7 +112,7 @@ def prepare_deal_time(obj, timekey, escape_md=True):
         return escape_mdv2(time_str) if escape_md else time_str
 
 
-def prepare_deal_incognito_client(obj, inckey):
+def prepare_deal_incognito_client_view(obj, inckey):
     val = prepare_external_field(obj, inckey)
 
     if val in BitrixFieldMappings.DEAL_INCOGNITO_MAPPING_CLIENT:
@@ -98,7 +121,7 @@ def prepare_deal_incognito_client(obj, inckey):
         return False
 
 
-def prepare_deal_incognito_operator(obj, inckey):
+def prepare_deal_incognito_bot_view(obj, inckey):
     val = prepare_external_field(obj, inckey)
 
     if val in BitrixFieldMappings.DEAL_INCOGNITO_MAPPING_OPERATOR:

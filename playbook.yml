@@ -58,13 +58,13 @@
           - "--exclude=.idea"
     - name: Copy main service
       copy:
-        src: /opt/klumba_operator_bot/klumba_operator_bot.service
-        dest: /etc/systemd/system/klumba_operator_bot.service
+        src: /opt/klumba_bot/klumba_bot.service
+        dest: /etc/systemd/system/klumba_bot.service
         remote_src: yes
         force: yes
     - name: Copy backend service
       copy:
-        src: /opt/klumba_operator_bot/source/client_backend/wsgi_client_photos.service
+        src: /opt/klumba_bot/source/client_backend/wsgi_client_photos.service
         dest: /etc/systemd/system/wsgi_client_photos.service
         remote_src: yes
         force: yes
@@ -74,7 +74,7 @@
         state: absent
     - name: Copy Nginx config
       copy:
-        src: /opt/klumba_operator_bot/source/client_backend/client_photos_backend.conf
+        src: /opt/klumba_bot/source/client_backend/client_photos_backend.conf
         dest: /etc/nginx/sites-available/client_photos_backend.conf
         remote_src: yes
         force: yes
@@ -95,7 +95,7 @@
         state: restarted
     - name: Start main service
       systemd:
-        name: klumba_operator_bot
+        name: klumba_bot
         daemon_reload: yes
         enabled: yes
         state: restarted

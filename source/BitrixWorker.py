@@ -1,5 +1,7 @@
 import requests
+import time
 from threading import Lock
+from urllib.parse import urlencode
 
 import source.creds as creds
 import source.utils.Utils as Utils
@@ -13,14 +15,14 @@ from source.DealData import DealData
 logger = logging.getLogger(__name__)
 
 SESSION = requests.session()
-REQUESTS_TIMEOUT = 10
+REQUESTS_TIMEOUT = 10  # seconds
 REQUESTS_MAX_ATTEMPTS = 3
 
 # global bitrix worker error code
 BW_OK = 0
-BW_NO_SUCH_DEAL = 1
-BW_WRONG_STAGE = 2
-BW_INTERNAL_ERROR = 3
+BW_NO_SUCH_DEAL = -1
+BW_WRONG_STAGE = -2
+BW_INTERNAL_ERROR = -3
 
 # bitrix dicts
 PAYMENT_TYPES = {}
@@ -35,13 +37,27 @@ ORDERS_TYPES = {}
 ORDERS_TYPES_LOCK = Lock()
 DEAL_TIMES = {}
 DEAL_TIMES_LOCK = Lock()
+SUBDIVISIONS = {}
+SUBDIVISIONS_LOCK = Lock()
+DISTRICTS = {}
+DISTRICTS_LOCK = Lock()
+SOURCES = {}
+SOURCES_LOCK = Lock()
+BITRIX_USERS = []  # phone -> id mapping
+# TODO: users mappings refactoring
+BITRIX_IDS_USERS = []  # id -> name + last name, auxiliary mapping
+BITRIX_USERS_LOCK = Lock()
 
 # Bitrix OAuth keys
 # store in Telegram bot persistence to serialize automatically
 OAUTH_LOCK = Lock()
 
+SLEEP_INTERVAL = 0.5
+QUERY_LIMIT_EXCEEDED = 'QUERY_LIMIT_EXCEEDED'
 
-def send_request(method, params=None, handle_next=False):
+
+# if getter_method is True -> then result absence mead there is no such entity
+def send_request(method, params=None, handle_next=False, getter_method=False):
     if params is None:
         params = {}
 
@@ -50,13 +66,25 @@ def send_request(method, params=None, handle_next=False):
             response = SESSION.post(url=creds.BITRIX_API_URL + method,
                                     json=params, timeout=REQUESTS_TIMEOUT)
 
+            # code 400 in response to getter method means object not found
+            if getter_method and response.status_code == 400:
+                return None
+
             if response and response.ok:
                 json = response.json()
+                error = json.get('error')
+
+                # TODO: handle QUERY_LIMIT_EXCEEDED properly
+                if error == QUERY_LIMIT_EXCEEDED:
+                    time.sleep(SLEEP_INTERVAL)
+                    continue
+
                 next_counter = json.get('next')
                 result = json.get('result')
 
                 # handling List[]
                 if result is not None and handle_next and next_counter:
+                    time.sleep(SLEEP_INTERVAL)
                     params['start'] = next_counter
                     result.extend(send_request(method, params, True))
                     return result
@@ -76,21 +104,36 @@ def send_request(method, params=None, handle_next=False):
             error = 'Sending Bitrix api request error %s' % e
             logger.error(error)
 
-    return None
+    raise Exception(f'B24 request failed: {method} using {params}')
+
+
+# TODO: finish batch queries implementation!
+# queries: {1: {'method': 'crm.deals.get', params:{...}}, 2: ... }
+def send_batch(queries, halt=False):
+    params = {}
+    for k, v in queries.items():
+        method = v['method']
+        params[k] = method + '?' + urlencode(params)
+
+    params = {
+        'halt': 1 if halt else 0,
+        'cmd': params
+    }
+
+    return send_request('batch', params)
 
 
 def get_deal(deal_id):
-    result = send_request('crm.deal.get', {'id': deal_id})
+    result = send_request('crm.deal.get', {'id': deal_id}, getter_method=True)
     return result
 
 
 def update_deal(deal_id, fields):
-    result = send_request('crm.deal.update', {'id': deal_id,
-                                              'fields': fields})
-    return result
+    send_request('crm.deal.update', {'id': deal_id,
+                                     'fields': fields})
 
 
-# TODO: batch load if 'next' in result
+# load B24 userfield
 def _load_userfield_dict(field_id):
     result = {}
 
@@ -100,6 +143,24 @@ def _load_userfield_dict(field_id):
         result = {el['ID']: el['VALUE'] for el in userfield_list}
     except Exception as e:
         logger.error("Exception getting userfield dict: %s", e)
+
+    return result
+
+
+# load B24 standard references
+def _load_reference(ref_id):
+    result = {}
+
+    try:
+        reference_list = send_request('crm.status.list',
+                                      {
+                                          'order': {'SORT': 'ASC'},
+                                          'filter': {'ENTITY_ID': ref_id}
+                                      },
+                                      handle_next=True)
+        result = {el['STATUS_ID']: el['NAME'] for el in reference_list}
+    except Exception as e:
+        logger.error("Exception getting reference dict: %s", e)
 
     return result
 
@@ -122,15 +183,6 @@ def _load_payment_methods():
             PAYMENT_METHODS = result
 
 
-def _load_couriers():
-    global COURIERS
-    result = _load_userfield_dict(COURIER_FIELD_ID)
-
-    if result:
-        with COURIERS_LOCK:
-            COURIERS = result
-
-
 def _load_orders_types():
     global ORDERS_TYPES
     result = _load_userfield_dict(ORDER_TYPE_FIELD_ID)
@@ -149,15 +201,42 @@ def _load_deal_times():
             DEAL_TIMES = result
 
 
+def _load_couriers():
+    result = {}
+    params = {
+        'sort': 'LAST_NAME',
+        'order': 'ASC',
+        'FILTER': {USER_POSITION_ALIAS: COURIER_POSITION_ID, 'ACTIVE': 'True'}
+    }
+
+    try:
+        couriers = send_request('user.get', params, handle_next=True)
+
+        result = {c['ID']: Utils.prepare_external_field(c, 'LAST_NAME') + ' ' + Utils.prepare_external_field(c, 'NAME')
+                  for c in couriers}
+
+    except Exception as e:
+        logging.error("Exception getting florists, %s", e)
+
+    global COURIERS
+    if result:
+        with COURIERS_LOCK:
+            COURIERS = result
+
+
 def _load_florists():
     result = {}
-    params = {USER_POSITION_ALIAS: FLORIST_POSITION_ID}
+    params = {
+        'sort': 'LAST_NAME',
+        'order': 'ASC',
+        'FILTER': {USER_POSITION_ALIAS: FLORIST_POSITION_ID, 'ACTIVE': 'True'}
+    }
 
     try:
         florists = send_request('user.get', params, handle_next=True)
 
-        result = {f['ID']: Utils.prepare_external_field(f, 'NAME') + ' ' + Utils.prepare_external_field(f, 'LAST_NAME')
-                  for f in florists if f['ACTIVE']}  # self-filtering active users - due to bug in Bitrix24 API
+        result = {f['ID']: Utils.prepare_external_field(f, 'LAST_NAME') + ' ' + Utils.prepare_external_field(f, 'NAME')
+                  for f in florists}
 
     except Exception as e:
         logging.error("Exception getting florists, %s", e)
@@ -168,74 +247,82 @@ def _load_florists():
             FLORISTS = result
 
 
+def load_active_users():
+    result = {}
+    params = {'filter': {'ACTIVE': 'True'}}
+
+    try:
+        # can't select particular fields due to Bitrix API restrictions
+        # load all fields for now
+        # TODO: possible performance tests needed
+        result = send_request('user.get', params, handle_next=True)
+
+        users_dict = {}
+        users_ids_dict = {}
+
+        for u in result:
+            users_dict[Utils.prepare_phone_number(u[USER_MAIN_PHONE_ALIAS])] = u[USER_ID_ALIAS]
+            users_ids_dict[u[USER_ID_ALIAS]] = Utils.prepare_external_field(u, 'LAST_NAME') + ' ' + \
+                                               Utils.prepare_external_field(u, 'NAME')
+
+        global BITRIX_USERS
+        global BITRIX_IDS_USERS
+        if result:
+            with BITRIX_USERS_LOCK:
+                BITRIX_USERS = users_dict
+                BITRIX_IDS_USERS = users_ids_dict
+
+    except Exception as e:
+        logging.error("Exception getting bitrix users, %s", e)
+
+
+def _load_subdivisions():
+    global SUBDIVISIONS
+    result = _load_userfield_dict(DEAL_SUBDIVISION_FIELD_ID)
+
+    if result:
+        with SUBDIVISIONS_LOCK:
+            SUBDIVISIONS = result
+
+
+def _load_districts():
+    global DISTRICTS
+    result = _load_userfield_dict(DEAL_DISTRICT_FIELD_ID)
+
+    if result:
+        with DISTRICTS_LOCK:
+            DISTRICTS = result
+
+
+def _load_sources():
+    global SOURCES
+    result = _load_reference(DEAL_SOURCE_REFERENCE_ID)
+
+    if result:
+        with SOURCES_LOCK:
+            SOURCES = result
+
+
 def load_dicts():
+    # TODO: batch load instead of sleep intervals workaround
+    sleep_interval = 2
     _load_couriers()
+    time.sleep(sleep_interval)
     _load_florists()
+    time.sleep(sleep_interval)
     _load_payment_methods()
+    time.sleep(sleep_interval)
     _load_payment_types()
+    time.sleep(sleep_interval)
     _load_orders_types()
+    time.sleep(sleep_interval)
     _load_deal_times()
-
-
-def process_deal_info(deal_id, check_approved=True):
-    deal = get_deal(deal_id)
-
-    deal_data = DealData()
-    deal_data.deal_id = deal_id
-
-    if not deal:
-        return BW_NO_SUCH_DEAL, deal_data
-
-    if check_approved and deal[DEAL_STAGE_ALIAS] != DEAL_IS_IN_APPROVED_STAGE:
-        return BW_WRONG_STAGE, deal_data
-
-    deal_data.order = Utils.prepare_external_field(deal, DEAL_ORDER_ALIAS)
-
-    contact_id = deal.get(DEAL_CONTACT_ALIAS)
-    contact_data = send_request('crm.contact.get',
-                                {'id': contact_id})
-
-    contact_name = Utils.prepare_external_field(contact_data, CONTACT_USER_NAME_ALIAS)
-    contact_phone = ''
-
-    if contact_data and contact_data.get(CONTACT_HAS_PHONE_ALIAS) == CONTACT_HAS_PHONE:
-        contact_phone = Utils.prepare_external_field(contact_data[CONTACT_PHONE_ALIAS][0], 'VALUE')
-
-    deal_data.contact = contact_name + ' ' + contact_phone
-    deal_data.order_received_by = Utils.prepare_external_field(deal, DEAL_ORDER_RECEIVED_BY_ALIAS)
-    deal_data.total_sum = Utils.prepare_external_field(deal, DEAL_TOTAL_SUM_ALIAS)
-
-    payment_type_id = Utils.prepare_external_field(deal, DEAL_PAYMENT_TYPE_ALIAS)
-    deal_data.payment_type = Utils.prepare_external_field(PAYMENT_TYPES, payment_type_id, PAYMENT_TYPES_LOCK)
-
-    payment_method_id = Utils.prepare_external_field(deal, DEAL_PAYMENT_METHOD_ALIAS)
-
-    deal_data.payment_method = Utils.prepare_external_field(PAYMENT_METHODS, payment_method_id, PAYMENT_METHODS_LOCK)
-
-    deal_data.payment_status = Utils.prepare_external_field(deal, DEAL_PAYMENT_STATUS_ALIAS)
-    deal_data.prepaid = Utils.prepare_external_field(deal, DEAL_PREPAID_ALIAS)
-    deal_data.to_pay = Utils.prepare_external_field(deal, DEAL_TO_PAY_ALIAS)
-    deal_data.incognito = Utils.prepare_deal_incognito_operator(deal, DEAL_INCOGNITO_ALIAS)
-    deal_data.order_comment = Utils.prepare_external_field(deal, DEAL_ORDER_COMMENT_ALIAS)
-    deal_data.delivery_comment = Utils.prepare_external_field(deal, DEAL_DELIVERY_COMMENT_ALIAS)
-    deal_data.courier_id = Utils.prepare_external_field(deal, DEAL_COURIER_ALIAS)
-    deal_data.florist_id = Utils.prepare_external_field(deal, DEAL_FLORIST_NEW_ALIAS)
-    deal_data.order_type_id = Utils.prepare_external_field(deal, DEAL_ORDER_TYPE_ALIAS)
-
-    return BW_OK, deal_data
-
-
-def get_file_dl_url(bitrix_file_id):
-    file = send_request('disk.file.get',
-                        {'id': bitrix_file_id})
-
-    dl_url = file.get(DISK_FILE_DL_URL_ALIAS)
-
-    if not dl_url:
-        logger.error('Error loading Bitrix file metadata: no URL provided')
-        return None
-
-    return dl_url
+    time.sleep(sleep_interval)
+    _load_subdivisions()
+    time.sleep(sleep_interval)
+    _load_districts()
+    time.sleep(sleep_interval)
+    _load_sources()
 
 
 def refresh_oauth(refresh_token):
@@ -261,3 +348,49 @@ def refresh_oauth(refresh_token):
             logger.error(error)
 
     return None, None
+
+
+def get_user_position(user_id):
+    # user.get isn't a getter method, but a list method. Yep, B24 API is irrational
+    users = send_request('user.get',
+                         {'ID': user_id})
+
+    return users[0][USER_POSITION_ALIAS]
+
+
+def get_user_name(user_id):
+    if not user_id:
+        return None
+
+    users = send_request('user.get',
+                         {'ID': user_id})
+
+    user = users[0]
+    return user[USER_NAME_ALIAS] + ' ' + user[USER_SURNAME_ALIAS]
+
+
+def get_contact_data(contact_id):
+    if not contact_id:
+        return None
+
+    contact_data = send_request('crm.contact.get',
+                                {'id': contact_id}, getter_method=True)
+
+    contact_phone = ''
+
+    if contact_data and contact_data.get(CONTACT_HAS_PHONE_ALIAS) == CONTACT_HAS_PHONE:
+        contact_phone = Utils.prepare_external_field(contact_data[CONTACT_PHONE_ALIAS][0], 'VALUE')
+
+    contact_name = Utils.prepare_external_field(contact_data, CONTACT_USER_NAME_ALIAS)
+
+    return {
+        CONTACT_USER_NAME_ALIAS: contact_name,
+        CONTACT_PHONE_ALIAS: contact_phone
+    }
+
+
+def get_deal_stage(deal_id):
+    deal = send_request('crm.deal.get',
+                        {'ID': deal_id}, getter_method=True)
+
+    return deal[DEAL_STAGE_ALIAS]  # throws exception in case of problems

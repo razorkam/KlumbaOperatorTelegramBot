@@ -1,41 +1,67 @@
-from .User import State
-from . import creds
-from . import TextSnippets as GlobalTxt, config
-from . import Commands as Cmd
-from . import TelegramWorkerStarter as Starter
-from . import BitrixWorker as BW
+import source.creds as creds
+import source.TextSnippets as GlobalTxt
+import source.config as cfg
+import source.Commands as Cmd
+import source.BitrixWorker as BW
 
-import source.cmd_handlers.PhotosLoading1.TgHandlers as PhotoLoading1
-import source.cmd_handlers.Checklist2.TgHandlers as Checklist2
-import source.cmd_handlers.Courier3.TgHandlers as Courier3
-import source.cmd_handlers.Florist4.TgHandlers as Florist4
-import source.cmd_handlers.FloristOrder5.TgHandlers as FloristOrders5
-import source.cmd_handlers.Reserve6.TgHandlers as Reserve6
+import source.BitrixFieldMappings as BFM
+import source.utils.Utils as Utils
+import source.TelegramCommons as TgCommons
+import source.StorageWorker as StorageWorker
+from source.State import State
+import source.User as User
+
+import source.cmd_handlers.Equip.TgHandlers as Equip
+import source.cmd_handlers.Checklist.TgHandlers as Checklist
+import source.cmd_handlers.SetCourier.TgHandlers as SetCourier
+import source.cmd_handlers.SetFlorist.TgHandlers as SetFlorist
+import source.cmd_handlers.FloristOrder.TgHandlers as FloristOrder
+import source.cmd_handlers.Reserve.TgHandlers as Reserve
+import source.cmd_handlers.Courier.TgHandlers as Courier
 
 import logging
 import os
 import traceback
 
-from telegram.ext import Updater, MessageHandler, Filters, PicklePersistence,\
-    ConversationHandler, CommandHandler, CallbackContext
+from telegram.ext import Updater, MessageHandler, Filters, PicklePersistence, \
+    ConversationHandler, CommandHandler, CallbackContext, CallbackQueryHandler
 
-from telegram import ParseMode, Update
-
+from telegram import Update, KeyboardButton, BotCommand
 
 logger = logging.getLogger(__name__)
 
 
-def handle_login(update, context):
-    user = context.user_data.get(config.USER_PERSISTENT_KEY)
-    user.bitrix_login = update.message.text
-    update.message.reply_markdown_v2(GlobalTxt.REQUEST_PASSWORD_MESSAGE)
-    return State.PASSWORD_REQUESTED
+@TgCommons.tg_callback
+def handle_login(update: Update, context, user):
+    auth_button = KeyboardButton(text=GlobalTxt.SEND_CONTACT_BUTTON_TEXT, request_contact=True)
+    contact = update.message.contact
 
+    # check that sent contact is user's own contact
+    if not contact or contact.user_id != update.effective_user.id:
+        TgCommons.send_mdv2_reply_keyboard(update.effective_user, GlobalTxt.AUTHORIZATION_FAILED,
+                                           [[auth_button]], True)
+        return
 
-def handle_password(update, context):
-    user = context.user_data.get(config.USER_PERSISTENT_KEY)
-    user.bitrix_password = update.message.text
-    return Starter.restart(update, context)
+    user.phone_number = Utils.prepare_phone_number(contact.phone_number)
+
+    is_authorized = StorageWorker.check_authorization(user)
+
+    if contact.user_id == update.effective_user.id and is_authorized:
+        position = BW.get_user_position(user.bitrix_user_id)
+
+        if position == BFM.COURIER_POSITION_ID:
+            authorized_user = User.Courier.from_base(user)
+        else:
+            authorized_user = User.Operator.from_base(user)
+
+        TgCommons.send_reply_keyboard_remove(update.effective_user, GlobalTxt.AUTHORIZATION_SUCCESSFUL)
+        context.user_data[cfg.USER_PERSISTENT_KEY] = authorized_user
+
+        return authorized_user.restart(update, context)
+    else:
+        TgCommons.send_mdv2_reply_keyboard(update.effective_user, GlobalTxt.REQUEST_LOGIN_MESSAGE,
+                                           [[auth_button]], True)
+        return State.LOGIN_REQUESTED
 
 
 def error_handler(update, context: CallbackContext):
@@ -50,54 +76,64 @@ def error_handler(update, context: CallbackContext):
         # don't confuse user with particular error data
         if update:
             # don't confuse user with particular errors data
-            update.effective_user.send_message(text=GlobalTxt.UNKNOWN_ERROR, parse_mode=ParseMode.MARKDOWN_V2)
+            TgCommons.send_mdv2(update.effective_user, GlobalTxt.UNKNOWN_ERROR)
     except Exception as e:
         logger.error(msg="Exception while handling lower-level exception:", exc_info=e)
 
 
+MENU_HANDLERS = [Equip.cv_handler,
+                 Checklist.cv_handler,
+                 SetCourier.cv_handler,
+                 SetFlorist.cv_handler,
+                 FloristOrder.cv_handler,
+                 Reserve.cv_handler]
+
 cv_handler = ConversationHandler(
-        entry_points=[CommandHandler([Cmd.START, Cmd.CANCEL], Starter.restart)],
-        states={
-            State.LOGIN_REQUESTED: [MessageHandler(Filters.text, handle_login)],
-            State.PASSWORD_REQUESTED: [MessageHandler(Filters.text, handle_password)],
-            State.IN_MENU: [PhotoLoading1.cv_handler,
-                            Checklist2.cv_handler,
-                            Courier3.cv_handler,
-                            Florist4.cv_handler,
-                            FloristOrders5.cv_handler,
-                            Reserve6.cv_handler]  # all conv handlers here
-        },
-        fallbacks=[CommandHandler([Cmd.START, Cmd.CANCEL], Starter.restart),
-                   MessageHandler(Filters.all, Starter.global_fallback)],
-    )
+    entry_points=[CommandHandler([Cmd.START, Cmd.CANCEL, Cmd.LOGOUT], TgCommons.restart),
+                  CallbackQueryHandler(callback=TgCommons.restart, pattern=GlobalTxt.CANCEL_BUTTON_CB_DATA),
+                  *MENU_HANDLERS,
+                  Courier.cv_handler],
+    states={
+        State.LOGIN_REQUESTED: [MessageHandler(Filters.contact, handle_login)],
+        State.IN_OPERATOR_MENU: MENU_HANDLERS,  # all conv handlers here
+        State.IN_COURIER_MENU: [Courier.cv_handler]
+    },
+    fallbacks=[CommandHandler([Cmd.START, Cmd.CANCEL], TgCommons.restart),
+               CallbackQueryHandler(callback=TgCommons.restart, pattern=GlobalTxt.CANCEL_BUTTON_CB_DATA),
+               CommandHandler([Cmd.LOGOUT], TgCommons.logout),
+               MessageHandler(Filters.all, TgCommons.global_fallback),
+               CallbackQueryHandler(callback=TgCommons.global_fallback, pattern=GlobalTxt.ANY_STRING_PATTERN)]
+)
 
 
 def bitrix_oauth_update_job(context: CallbackContext):
     with BW.OAUTH_LOCK:
-        refresh_token = context.bot_data[config.BOT_REFRESH_TOKEN_PERSISTENT_KEY]
+        refresh_token = context.bot_data[cfg.BOT_REFRESH_TOKEN_PERSISTENT_KEY]
         a_token, r_token = BW.refresh_oauth(refresh_token)
 
         if a_token:
-            context.bot_data[config.BOT_ACCESS_TOKEN_PERSISTENT_KEY] = a_token
-            context.bot_data[config.BOT_REFRESH_TOKEN_PERSISTENT_KEY] = r_token
+            context.bot_data[cfg.BOT_ACCESS_TOKEN_PERSISTENT_KEY] = a_token
+            context.bot_data[cfg.BOT_REFRESH_TOKEN_PERSISTENT_KEY] = r_token
 
 
 # entry point
 def run():
-    os.makedirs(config.DATA_DIR_NAME, exist_ok=True)
-    storage = PicklePersistence(filename=os.path.join(config.DATA_DIR_NAME, config.TG_STORAGE_NAME))
+    os.makedirs(cfg.DATA_DIR_NAME, exist_ok=True)
+    storage = PicklePersistence(filename=os.path.join(cfg.DATA_DIR_NAME, cfg.TG_STORAGE_NAME))
 
     updater = Updater(creds.TG_BOT_TOKEN, persistence=storage)
     dispatcher = updater.dispatcher
 
+    updater.bot.set_my_commands(Cmd.BOT_COMMANDS_LIST)
+
     # handle Bitrix OAuth keys update here in job queue
     bot_data = dispatcher.bot_data
-    if config.BOT_ACCESS_TOKEN_PERSISTENT_KEY not in bot_data:
-        bot_data[config.BOT_ACCESS_TOKEN_PERSISTENT_KEY] = creds.BITRIX_APP_ACCESS_TOKEN
-        bot_data[config.BOT_REFRESH_TOKEN_PERSISTENT_KEY] = creds.BITRIX_APP_REFRESH_TOKEN
+    if cfg.BOT_ACCESS_TOKEN_PERSISTENT_KEY not in bot_data:
+        bot_data[cfg.BOT_ACCESS_TOKEN_PERSISTENT_KEY] = creds.BITRIX_APP_ACCESS_TOKEN
+        bot_data[cfg.BOT_REFRESH_TOKEN_PERSISTENT_KEY] = creds.BITRIX_APP_REFRESH_TOKEN
 
     jq = updater.job_queue
-    jq.run_repeating(bitrix_oauth_update_job, interval=config.BITRIX_OAUTH_UPDATE_INTERVAL, first=1)
+    jq.run_repeating(bitrix_oauth_update_job, interval=cfg.BITRIX_OAUTH_UPDATE_INTERVAL, first=1)
 
     dispatcher.add_handler(cv_handler)
     for fb in cv_handler.fallbacks:

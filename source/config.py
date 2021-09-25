@@ -1,8 +1,9 @@
 import logging
+import datetime
 
 # dirs
-DATA_DIR_NAME = '/home/.klumba_operator_bot'
-# DATA_DIR_NAME = '/home/.klumba_operator_bot_test'  # test env
+# DATA_DIR_NAME = '/home/.klumba_bot'
+DATA_DIR_NAME = '/home/.klumba_bot_test'  # test env
 ORDERS_DIR_NAME = 'orders_data'
 
 # Telegram bot persistent storage
@@ -21,3 +22,6 @@ BITRIX_DICTS_DATABASE = 'bitrix_dicts.db'
 
 # times
 BITRIX_OAUTH_UPDATE_INTERVAL = 45 * 60  # seconds
+
+# use UTC+3 timezone in all datetime-related features
+TIMEZONE = datetime.timezone(datetime.timedelta(hours=3))
