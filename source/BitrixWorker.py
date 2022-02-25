@@ -354,8 +354,10 @@ def get_user_position(user_id):
     # user.get isn't a getter method, but a list method. Yep, B24 API is irrational
     users = send_request('user.get',
                          {'ID': user_id})
-
-    return users[0][USER_POSITION_ALIAS]
+    if users and len(users) > 0:
+        return users[0][USER_POSITION_ALIAS]
+    else:
+        return None
 
 
 def get_user_name(user_id):
@@ -365,8 +367,11 @@ def get_user_name(user_id):
     users = send_request('user.get',
                          {'ID': user_id})
 
-    user = users[0]
-    return user[USER_NAME_ALIAS] + ' ' + user[USER_SURNAME_ALIAS]
+    if users and len(users) > 0:
+        user = users[0]
+        return user[USER_NAME_ALIAS] + ' ' + user[USER_SURNAME_ALIAS]
+    else:
+        return None
 
 
 def get_contact_data(contact_id):

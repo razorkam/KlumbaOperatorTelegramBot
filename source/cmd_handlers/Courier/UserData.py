@@ -7,7 +7,7 @@ from source.DealData import DealData
 
 
 # use hardcoded deals per page number to simplify logic for now
-DEALS_PER_PAGE = 3
+DEALS_PER_PAGE = 5
 
 
 # maintain separate deals type (current user state sometimes can't be different when list rendering needed)

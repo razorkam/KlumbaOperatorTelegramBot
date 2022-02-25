@@ -72,13 +72,8 @@ def update_deal_by_client(deal_id, data):
             DEAL_COMMENT_APPROVED_ALIAS: DEAL_COMMENT_APPROVED_STUB if approved else None
         }
 
-        result = BW.update_deal(deal_id, fields)
-
-        if result:
-            return True
-        else:
-            logger.error('Error updating client deal info: %s', result)
-            return False
+        BW.update_deal(deal_id, fields)
+        return True
 
     except Exception as e:
         logger.error('Error updating client deal info: %s', e)

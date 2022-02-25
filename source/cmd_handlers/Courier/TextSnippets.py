@@ -2,13 +2,13 @@ from source import Commands as Cmd
 import source.cmd_handlers.Courier.UserData as UserData
 
 # deals list
-DELIVERS_TODAY_BUTTON_TEXT = 'В доставке сегодня'
+DELIVERS_TODAY_BUTTON_TEXT = 'В доставке сегодня \U0001F7E9'
 DELIVERS_TODAY_BUTTON_CB = 'delivers_today'
-DELIVERS_TOMORROW_BUTTON_TEXT = 'В доставке завтра'
+DELIVERS_TOMORROW_BUTTON_TEXT = 'В доставке завтра \U0001F7E8'
 DELIVERS_TOMORROW_BUTTON_CB = 'delivers_tomorrow'
-ADVANCE_BUTTON_TEXT = 'Назначенные (заранее)'
+ADVANCE_BUTTON_TEXT = 'Назначенные (заранее) \U0001F7E6'
 ADVANCE_BUTTON_CB = 'advance'
-FINISHED_BUTTON_TEXT = 'Завершенные'
+FINISHED_BUTTON_TEXT = 'Завершенные \U0001F3C1'
 FINISHED_BUTTON_CB = 'finished'
 NEXT_PAGE_TEXT = '>'
 NEXT_PAGE_CB = 'next_page'
@@ -18,9 +18,9 @@ PREV_PAGE_CB = 'prev_page'
 # finished deals
 FINISHED_CHOOSE_DATE_TXT = 'Выберите дату:'
 FINISHED_CHOOSE_TYPE_TXT = 'Выберите тип:'
-LATE_BUTTON_TEXT = 'Опоздавшие'
+LATE_BUTTON_TEXT = 'Опоздавшие \U0000274C'
 LATE_BUTTON_CB = 'deals_late'
-IN_TIME_BUTTON_TEXT = 'Доставленные вовремя'
+IN_TIME_BUTTON_TEXT = 'Доставленные вовремя \U00002705'
 IN_TIME_BUTTON_CB = 'deals_in_time'
 
 
@@ -30,13 +30,13 @@ VIEW_DEAL_PATTERN = '^/' + VIEW_DEAL_PREFIX + '\\' + Cmd.CMD_DELIMETER + r'(\d+)
 
 
 # deal view
-FINISH_DEAL_BUTTON_TEXT = 'Заказ доставлен'
+FINISH_DEAL_BUTTON_TEXT = 'Заказ доставлен \U00002705 \U00002705 \U00002705'
 FINISH_DEAL_BUTTON_CB = 'finish_deal'
-WAREHOUSE_RETURN_DEAL_BUTTON_TEXT = 'Заказ вернулся на склад'
+WAREHOUSE_RETURN_DEAL_BUTTON_TEXT = 'Заказ вернулся на склад \U0001F3EA'
 WAREHOUSE_RETURN_DEAL_BUTTON_CB = 'warehouse_return_deal'
-ORDER_CONTENT_BUTTON_TEXT = 'Что заказано'
+ORDER_CONTENT_BUTTON_TEXT = 'Содержимое заказа \U0001F4DC'
 ORDER_CONTENT_BUTTON_CB = 'deal_order_content'
-BACK_TO_CUR_DEALS_LIST_BUTTON_TEXT = 'Назад к списку заказов'
+BACK_TO_CUR_DEALS_LIST_BUTTON_TEXT = 'Назад к списку заказов \U000021A9'
 BACK_TO_CUR_DEALS_LIST_BUTTON_CB = 'return_to_deals_list'
 BACK_TO_CUR_DEAL_BUTTON_TEXT = 'Назад к заказу'
 BACK_TO_CUR_DEAL_BUTTON_CB = 'return_to_deal'

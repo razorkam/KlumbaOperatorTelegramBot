@@ -1,5 +1,5 @@
 FIELD_IS_EMPTY_PLACEHOLDER = 'нет'
-CANCEL_BUTTON_TEXT = 'Отмена'
+CANCEL_BUTTON_TEXT = 'Отмена \U0001F6AB'
 CANCEL_BUTTON_CB_DATA = 'cancel'
 ANY_STRING_PATTERN = '^.*$'  # matching any string without newline characters
 
@@ -8,7 +8,7 @@ SEND_CONTACT_BUTTON_TEXT = 'ВОЙТИ ПО НОМЕРУ ТЕЛЕФОНА'
 REQUEST_LOGIN_MESSAGE = 'Добро пожаловать в *Клумба: общий интерфейс*\\!\n' \
                         'Нажмите *' + SEND_CONTACT_BUTTON_TEXT + '* для входа\\.\n' \
                         'КНОПКА НАХОДИТСЯ ПОД ИЛИ НАД КЛАВИАТУРОЙ\\. \n' \
-                        'ЕСЛИ ОНА СКРЫТА \\- НУЖНО НАЖАТЬ НА КНОПКУ РЯДОМ С КЛАВИАТУРОЙ\\.'
+                        'ЕСЛИ ОНА СКРЫТА \\- НУЖНО НАЖАТЬ НА КНОПКУ \U0001F39B РЯДОМ С КЛАВИАТУРОЙ\\.'
 
 AUTHORIZATION_SUCCESSFUL = 'Авторизация пройдена\\!\n' \
                            'Теперь вы можете использовать возможности бота\\.'
@@ -32,7 +32,7 @@ MENU_DEAL_EQUIP_BUTTON_TEXT = 'Укомплектовать заказ \U0001F49
 MENU_DEAL_EQUIP_BUTTON_CB = 'deal_equip'
 MENU_DEAL_CHECKLIST_BUTTON_TEXT = 'Отправить заказ (назначить курьера) \U0001F69A'
 MENU_DEAL_CHECKLIST_BUTTON_CB = 'deal_checklist'
-MENU_DEAL_COURIER_BUTTON_TEXT = 'Назначить курьера (заранее) \U0001F9D1\u200d\U0001F9BC'
+MENU_DEAL_COURIER_BUTTON_TEXT = 'Назначить курьера (заранее) \U0001F468\u200d\U0001F9BC'
 MENU_DEAL_COURIER_BUTTON_CB = 'deal_courier'
 MENU_DEAL_FLORIST_ORDERS_BUTTON_TEXT = 'Заказы, где я флорист \U0001F5DE'
 MENU_DEAL_FLORIST_ORDERS_BUTTON_CB = 'deal_florist_orders'

@@ -44,6 +44,8 @@ def send_reply_keyboard_remove(tg_user: TelegramUser, msg_text):
 
 # send message to user with MarkdownV2 formatting and keyboard with cancel/menu button
 def send_mdv2(tg_user: TelegramUser, msg_text, inline_keyboard=None):
+    msg_text = '\U0001F7E2 \n\n' + msg_text
+
     cancel_button = InlineKeyboardButton(text=GlobalTxt.CANCEL_BUTTON_TEXT,
                                          callback_data=GlobalTxt.CANCEL_BUTTON_CB_DATA)
 

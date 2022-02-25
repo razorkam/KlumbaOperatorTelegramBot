@@ -6,11 +6,11 @@ WRONG_DEAL_STAGE = 'Заказ должен находиться в в стад�
                    'Измените стадию заказа и попробуйте снова\\.'
 
 WILL_YOU_RESERVE = 'Резервируем товар для заказа {}?'
-RESERVE_YES_TXT = 'Отложить товар сейчас'
+RESERVE_YES_TXT = 'Отложить товар сейчас  \U0001F4F7'
 RESERVE_YES_KEY = 'reserve_yes'
-SWITCH_STAGE_WAITING_FOR_SUPPLY_TXT = 'Ждет поставки'
+SWITCH_STAGE_WAITING_FOR_SUPPLY_TXT = 'Ждет поставки \U0000231B'
 SWITCH_STAGE_WAITING_FOR_SUPPLY_KEY = 'reserve_waiting_for_supply'
-SWITCH_STAGE_PROCESSED_TXT = 'Резерв не нужен'
+SWITCH_STAGE_PROCESSED_TXT = 'Резерв не нужен \U0001F90C'
 SWITCH_STAGE_PROCESSED_KEY = 'reserve_not_needed'
 RESERVE_CB_PATTERN = '^' + RESERVE_YES_KEY + '$|^' + SWITCH_STAGE_WAITING_FOR_SUPPLY_KEY + '$|^' \
                      + SWITCH_STAGE_PROCESSED_KEY + '$'
