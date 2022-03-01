@@ -30,6 +30,7 @@ from telegram import Update, KeyboardButton, BotCommand
 
 logger = logging.getLogger(__name__)
 
+JOB_QUEUE = None
 
 @TgCommons.tg_callback
 def handle_login(update: Update, context, user):
@@ -133,6 +134,9 @@ def run():
         bot_data[cfg.BOT_REFRESH_TOKEN_PERSISTENT_KEY] = creds.BITRIX_APP_REFRESH_TOKEN
 
     jq = updater.job_queue
+    global JOB_QUEUE
+    JOB_QUEUE = jq
+
     jq.run_repeating(bitrix_oauth_update_job, interval=cfg.BITRIX_OAUTH_UPDATE_INTERVAL, first=1)
 
     dispatcher.add_handler(cv_handler)

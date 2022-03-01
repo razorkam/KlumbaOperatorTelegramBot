@@ -25,3 +25,7 @@ BITRIX_OAUTH_UPDATE_INTERVAL = 45 * 60  # seconds
 
 # use UTC+3 timezone in all datetime-related features
 TIMEZONE = datetime.timezone(datetime.timedelta(hours=3))
+
+
+HTTP_SERVER_PORT = 8081
+HTTP_SERVER_ADDRESS = '0.0.0.0'

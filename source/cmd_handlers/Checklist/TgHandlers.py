@@ -71,7 +71,7 @@ def change_courier(update, context: CallbackContext, user: Operator):
 
 def request_photo(update, context: CallbackContext, user: Operator):
     terminal_elt = Txt.DEAL_TERMINAL_ELT if user.deal_data.terminal_needed else ''
-    change_elt = Txt.DEAL_CHANGE_ELT if user.deal_data.change_sum else ''
+    change_elt = Txt.DEAL_CHANGE_ELT.format(user.deal_data.change_sum) if user.deal_data.change_sum else ''
 
     courier = Utils.prepare_external_field(BW.COURIERS, user.deal_data.courier_id, BW.COURIERS_LOCK)
 
