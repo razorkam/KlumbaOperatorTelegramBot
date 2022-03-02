@@ -37,7 +37,7 @@ def update_deal_image(user: Operator):
     photos_list = user.equip.encode_deal_photos()
     deal_data = user.deal_data
 
-    # switch to previout stage first in case of repeat equip - to trigger robots properly
+    # switch to previous stage first in case of repeat equip - to trigger robots properly
     if user.equip.repeating:
         BW.update_deal(deal_data.deal_id, {DEAL_STAGE_ALIAS: DEAL_FLORIST_STATUS_ID})
 

@@ -399,3 +399,28 @@ def get_deal_stage(deal_id):
                         {'ID': deal_id}, getter_method=True)
 
     return deal[DEAL_STAGE_ALIAS]  # throws exception in case of problems
+
+
+def generate_photo_link(obj, access_token):
+    path = obj['downloadUrl'].replace('auth=', 'auth=' + access_token)
+    return creds.BITRIX_MAIN_PAGE + path
+
+
+def process_deal_photo_dl_urls(deal, access_token, field_aliases=()):
+    photos_list = []
+
+    for fa in field_aliases:
+        if fa in deal:
+            data = deal[fa]
+            if isinstance(data, list):
+                for photo in data:
+                    photos_list.append(generate_photo_link(photo, access_token))
+            else:
+                photos_list.append(generate_photo_link(data, access_token))
+
+    return photos_list
+
+
+def get_deal_photo_dl_urls(deal_id, access_token, field_aliases=()):
+    deal = get_deal(deal_id)
+    return process_deal_photo_dl_urls(deal, access_token, field_aliases)

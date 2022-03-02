@@ -1,5 +1,6 @@
 from source.DealData import DealData
 from source.State import State
+from source.festive_approvement.UserData import UserData as FestiveData
 
 
 class BaseUser:
@@ -10,6 +11,9 @@ class BaseUser:
 
         # any deal description
         self.deal_data = DealData()
+
+        # data of festive approvement
+        self.festive_data = FestiveData()
 
     def __getstate__(self):
         return {

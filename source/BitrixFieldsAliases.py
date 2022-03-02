@@ -52,6 +52,9 @@ DEAL_IS_LATE_ALIAS = 'UF_CRM_1631979755121'  # Заказ опоздал
 DEAL_IS_LATE_REASON_ALIAS = 'UF_CRM_1631979785526'  # Причина опоздания заказа
 DEAL_WAREHOUSE_RETURN_REASON = 'UF_CRM_1613565471434'  # Причина возврата на склад, кому и куда отдан
 DEAL_WAREHOUSE_RETURNED = 'UF_CRM_1640240629788'  # Заказ вернулся на склад (да \ нет)
+DEAL_LINK_ALIAS = 'UF_CRM_1581375809'  # Ссылка на заказ
+DEAL_ASSIGNED_ALIAS = 'ASSIGNED_BY_ID'  # Ответственный
+
 
 # deal field ID's
 COURIER_FIELD_ID = '1009'  # Курьер
@@ -101,3 +104,12 @@ WEBHOOK_CLIENT_COMMENT_ALIAS = 'client_comment'
 WEBHOOK_CLIENT_CALLBACK_ALIAS = 'client_callback'
 WEBHOOK_EQUIPPER_ALIAS = 'equipper'
 WEBHOOK_SOURCE_ALIAS = 'source'
+WEBHOOK_CONTACT_ALIAS = 'contact'
+WEBHOOK_HAS_RESERVE_ALIAS = 'has_reserve'
+
+
+# festive approvement
+FESTIVE_APPROVEMENT_ALIAS = 'UF_CRM_1646001150'  # Праздничное согласование (список)
+FESTIVE_DECLINE_COMMENT_ALIAS = 'UF_CRM_1646163933'  # Комментарий по отклонению
+FESTIVE_DECLINE_USER_ALIAS = 'UF_CRM_1646208854'  # Кто отклонил
+

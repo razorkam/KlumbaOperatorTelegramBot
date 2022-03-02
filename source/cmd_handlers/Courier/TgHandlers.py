@@ -342,7 +342,7 @@ MENU_HANDLERS = [CallbackQueryHandler(callback=delivers_today, pattern=Txt.DELIV
                  CallbackQueryHandler(callback=finished, pattern=Txt.FINISHED_BUTTON_CB),
                  CallbackQueryHandler(callback=prev_page, pattern=Txt.PREV_PAGE_CB),
                  CallbackQueryHandler(callback=next_page, pattern=Txt.NEXT_PAGE_CB),
-                 MessageHandler(Filters.regex(Txt.VIEW_DEAL_PATTERN), view_deal)]
+                 MessageHandler(Filters.chat_type.private & Filters.regex(Txt.VIEW_DEAL_PATTERN), view_deal)]
 
 cv_handler = ConversationHandler(
     entry_points=MENU_HANDLERS,

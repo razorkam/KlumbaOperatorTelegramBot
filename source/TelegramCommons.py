@@ -1,8 +1,8 @@
-from functools import wraps
+from functools import wraps, partial
 
 from telegram.ext import CallbackContext
 from telegram import ParseMode, InlineKeyboardButton, InlineKeyboardMarkup, User as TelegramUser, \
-    Message as TelegramMessage, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
+    Message as TelegramMessage, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, Chat as TelegramChat
 
 import source.TextSnippets as GlobalTxt
 import source.config as cfg
@@ -10,26 +10,32 @@ from source.State import State
 from source.BaseUser import BaseUser
 import source.StorageWorker as StorageWorker
 
+CANCEL_BUTTON = InlineKeyboardButton(text=GlobalTxt.CANCEL_BUTTON_TEXT,
+                                     callback_data=GlobalTxt.CANCEL_BUTTON_CB_DATA)
+
 
 # decorator for PTB callbacks (update, context: CallbackContext)
 # - exposes user variable for fast cached user access from context
 # - changes user state to callback result
-def tg_callback(func):
-    @wraps(func)
-    def wrapper(update, context):
-        user = context.user_data.get(cfg.USER_PERSISTENT_KEY)
+def tg_callback(func=None, change_user_state=True):
+    if callable(func):
+        @wraps(func)
+        def wrapper(update, context):
+            user = context.user_data.get(cfg.USER_PERSISTENT_KEY)
 
-        if update.callback_query:
-            update.callback_query.answer()
+            if update.callback_query:
+                update.callback_query.answer()
 
-        state = func(update, context, user)
+            state = func(update, context, user)
 
-        if user:
-            user.state = state
+            if user and change_user_state:
+                user.state = state
 
-        return state
+            return state
 
-    return wrapper
+        return wrapper
+    else:
+        return partial(tg_callback, change_user_state=change_user_state)
 
 
 def send_mdv2_reply_keyboard(tg_user: TelegramUser, msg_text, reply_keyboard, one_time_keyboard):
@@ -44,31 +50,44 @@ def send_reply_keyboard_remove(tg_user: TelegramUser, msg_text):
 
 # send message to user with MarkdownV2 formatting and keyboard with cancel/menu button
 def send_mdv2(tg_user: TelegramUser, msg_text, inline_keyboard=None):
+    # using green mark
     msg_text = '\U0001F7E2 \n\n' + msg_text
 
-    cancel_button = InlineKeyboardButton(text=GlobalTxt.CANCEL_BUTTON_TEXT,
-                                         callback_data=GlobalTxt.CANCEL_BUTTON_CB_DATA)
-
     if inline_keyboard:
-        inline_keyboard.append([cancel_button])
+        inline_keyboard.append([CANCEL_BUTTON])
     else:
-        inline_keyboard = [[cancel_button]]
+        inline_keyboard = [[CANCEL_BUTTON]]
 
     tg_user.send_message(text=msg_text, parse_mode=ParseMode.MARKDOWN_V2,
                          reply_markup=InlineKeyboardMarkup(inline_keyboard), disable_web_page_preview=True)
 
 
+# send message to specific char with MarkdownV2 formatting and keyboard
+def send_mdv2_chat(chat: TelegramChat, msg_text, inline_keyboard=None, reply_id=None, need_cancel=False):
+    if need_cancel:
+        if inline_keyboard:
+            inline_keyboard.append([CANCEL_BUTTON])
+        else:
+            inline_keyboard = [[CANCEL_BUTTON]]
+
+    chat.send_message(text=msg_text, parse_mode=ParseMode.MARKDOWN_V2,
+                      reply_markup=InlineKeyboardMarkup(inline_keyboard) if inline_keyboard else None,
+                      disable_web_page_preview=True,
+                      reply_to_message_id=reply_id)
+
+
 # send message to user with MarkdownV2 formatting and keyboard with cancel/menu button
-def edit_mdv2(tg_msg: TelegramMessage, msg_text, keyboard=None):
+def edit_mdv2(tg_msg: TelegramMessage, msg_text, keyboard=None, need_cancel=True):
     cancel_button = InlineKeyboardButton(text=GlobalTxt.CANCEL_BUTTON_TEXT,
                                          callback_data=GlobalTxt.CANCEL_BUTTON_CB_DATA)
+    if need_cancel:
+        if keyboard:
+            keyboard.append([cancel_button])
+        else:
+            keyboard = [[cancel_button]]
 
-    if keyboard:
-        keyboard.append([cancel_button])
-    else:
-        keyboard = [[cancel_button]]
-
-    tg_msg.edit_text(text=msg_text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=InlineKeyboardMarkup(keyboard),
+    tg_msg.edit_text(text=msg_text, parse_mode=ParseMode.MARKDOWN_V2,
+                     reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None,
                      disable_web_page_preview=True)
 
 

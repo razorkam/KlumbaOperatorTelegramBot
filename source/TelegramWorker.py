@@ -1,3 +1,5 @@
+from telegram import Chat
+
 import source.creds as creds
 import source.TextSnippets as GlobalTxt
 import source.config as cfg
@@ -18,6 +20,7 @@ import source.cmd_handlers.SetFlorist.TgHandlers as SetFlorist
 import source.cmd_handlers.FloristOrder.TgHandlers as FloristOrder
 import source.cmd_handlers.Reserve.TgHandlers as Reserve
 import source.cmd_handlers.Courier.TgHandlers as Courier
+import source.festive_approvement.TgHandlers as FestiveApprovement
 
 import logging
 import os
@@ -29,8 +32,8 @@ from telegram.ext import Updater, MessageHandler, Filters, PicklePersistence, \
 from telegram import Update, KeyboardButton, BotCommand
 
 logger = logging.getLogger(__name__)
-
 JOB_QUEUE = None
+
 
 @TgCommons.tg_callback
 def handle_login(update: Update, context, user):
@@ -76,8 +79,11 @@ def error_handler(update, context: CallbackContext):
 
         # don't confuse user with particular error data
         if update:
-            # don't confuse user with particular errors data
-            TgCommons.send_mdv2(update.effective_user, GlobalTxt.UNKNOWN_ERROR)
+            if update.effective_chat.type == Chat.PRIVATE:
+                # don't confuse user with particular errors data
+                TgCommons.send_mdv2(update.effective_user, GlobalTxt.UNKNOWN_ERROR)
+            elif update.effective_chat.type in (Chat.GROUP, Chat.SUPERGROUP):
+                TgCommons.send_mdv2_chat(update.effective_chat, GlobalTxt.UNKNOWN_ERROR)
     except Exception as e:
         logger.error(msg="Exception while handling lower-level exception:", exc_info=e)
 
@@ -90,7 +96,8 @@ MENU_HANDLERS = [Equip.cv_handler,
                  Reserve.cv_handler]
 
 cv_handler = ConversationHandler(
-    entry_points=[CommandHandler([Cmd.START, Cmd.CANCEL, Cmd.LOGOUT], TgCommons.restart),
+    entry_points=[CommandHandler([Cmd.START, Cmd.CANCEL, Cmd.LOGOUT], TgCommons.restart,
+                                 filters=Filters.chat_type.private),
                   CallbackQueryHandler(callback=TgCommons.restart, pattern=GlobalTxt.CANCEL_BUTTON_CB_DATA),
                   *MENU_HANDLERS,
                   Courier.cv_handler],
@@ -99,10 +106,10 @@ cv_handler = ConversationHandler(
         State.IN_OPERATOR_MENU: MENU_HANDLERS,  # all conv handlers here
         State.IN_COURIER_MENU: [Courier.cv_handler]
     },
-    fallbacks=[CommandHandler([Cmd.START, Cmd.CANCEL], TgCommons.restart),
+    fallbacks=[CommandHandler([Cmd.START, Cmd.CANCEL], TgCommons.restart, filters=Filters.chat_type.private),
                CallbackQueryHandler(callback=TgCommons.restart, pattern=GlobalTxt.CANCEL_BUTTON_CB_DATA),
-               CommandHandler([Cmd.LOGOUT], TgCommons.logout),
-               MessageHandler(Filters.all, TgCommons.global_fallback),
+               CommandHandler([Cmd.LOGOUT], TgCommons.logout, filters=Filters.chat_type.private),
+               MessageHandler(Filters.chat_type.private & Filters.all, TgCommons.global_fallback),
                CallbackQueryHandler(callback=TgCommons.global_fallback, pattern=GlobalTxt.ANY_STRING_PATTERN)]
 )
 
@@ -139,6 +146,8 @@ def run():
 
     jq.run_repeating(bitrix_oauth_update_job, interval=cfg.BITRIX_OAUTH_UPDATE_INTERVAL, first=1)
 
+    dispatcher.add_handler(FestiveApprovement.FESTIVE_CV_HANDLER)
+    dispatcher.add_handler(FestiveApprovement.FESTIVE_REAPPROVE_HANDLER)
     dispatcher.add_handler(cv_handler)
     for fb in cv_handler.fallbacks:
         dispatcher.add_handler(fb)

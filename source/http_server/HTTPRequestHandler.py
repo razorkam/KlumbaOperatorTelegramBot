@@ -3,6 +3,9 @@ from urllib import parse
 import logging
 
 from source.BitrixFieldsAliases import *
+import source.BitrixFieldMappings as BFM
+import source.TelegramWorker as TgWorker
+import source.http_server.Jobs as Jobs
 from source import creds
 
 
@@ -22,8 +25,10 @@ class PostHandler(BaseHTTPRequestHandler):
 
                 action = query_components[WEBHOOK_ACTION_ALIAS][0]
 
-                if action == None:
-                    pass
+                if action == BFM.HTTP_ACTION_FESTIVE_PROCESSED:
+                    TgWorker.JOB_QUEUE.run_once(callback=Jobs.festive_deal_processed, when=0, context=query_components)
+                else:
+                    logger.error('Wrong action passed: %s', action)
 
             else:
                 logger.error('Wrong Bitrix webhook secret passed or not provided')

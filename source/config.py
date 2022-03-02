@@ -2,8 +2,8 @@ import logging
 import datetime
 
 # dirs
-DATA_DIR_NAME = '/home/.klumba_bot'
-# DATA_DIR_NAME = '/home/.klumba_bot_test'  # test env
+# DATA_DIR_NAME = '/home/.klumba_bot'
+DATA_DIR_NAME = '/home/.klumba_bot_test'  # test env
 ORDERS_DIR_NAME = 'orders_data'
 
 # Telegram bot persistent storage
@@ -27,5 +27,5 @@ BITRIX_OAUTH_UPDATE_INTERVAL = 45 * 60  # seconds
 TIMEZONE = datetime.timezone(datetime.timedelta(hours=3))
 
 
-HTTP_SERVER_PORT = 8081
+HTTP_SERVER_PORT = 8082
 HTTP_SERVER_ADDRESS = '0.0.0.0'

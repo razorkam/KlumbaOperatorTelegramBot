@@ -65,3 +65,10 @@ CONTACT_HAS_PHONE = 'Y'
 FLORIST_POSITION_ID = '2343'  # Флорист
 COURIER_POSITION_ID = '2347'  # Курьер
 
+# http server actions
+HTTP_ACTION_FESTIVE_PROCESSED = 'festive_processed'
+
+
+# festive approvement
+FESTIVE_APPROVEMENT_YES = '2891'
+FESTIVE_APPROVEMENT_NO = '2893'
