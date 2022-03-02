@@ -25,3 +25,6 @@ DEAL_DECLINED = '*Ссылка:* {}\n' \
 
 
 UNAPPROVED_HEADER_REPLACEMENT_PATTERN = ''
+
+USER_NOT_FOUND = 'Пользователь {} не найден. \n' \
+                 'Нужно зарегистрироваться в @KlumbaOperatorBot'

@@ -57,7 +57,7 @@ def festive_deal_processed(context: CallbackContext):
         deal_has_reserve = Utils.prepare_external_field(query_components, BFA.WEBHOOK_HAS_RESERVE_ALIAS)
 
         if deal_id != GlobalTxt.FIELD_IS_EMPTY_PLACEHOLDER:
-            if deal_has_reserve == BFM.DEAL_HAS_RESERVE_YES:
+            if deal_has_reserve == BFM.DEAL_HAS_RESERVE_YES_FRIENDLY:
                 photo_urls = BW.get_deal_photo_dl_urls(deal_id, access_token, (BFA.DEAL_ORDER_RESERVE_ALIAS,))
             else:
                 photo_urls = None

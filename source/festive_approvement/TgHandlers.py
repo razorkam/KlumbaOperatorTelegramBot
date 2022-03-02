@@ -22,6 +22,10 @@ import source.BitrixFieldMappings as BFM
 
 @TgCommons.tg_callback(False)
 def festive_decision(update: Update, context, user):
+    if not user:
+        TgCommons.send_mdv2_chat(update.effective_chat, Txt.USER_NOT_FOUND.format(update.effective_user.full_name))
+        return None
+
     user.festive_data.clear()
 
     action = context.match.group(1)

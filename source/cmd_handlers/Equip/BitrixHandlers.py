@@ -20,7 +20,7 @@ def set_deal_number(user: Operator, deal_id):
     user.deal_data.stage = deal.get(DEAL_STAGE_ALIAS)
     user.deal_data.supply_type = deal.get(DEAL_SUPPLY_METHOD_ALIAS)
 
-    if user.deal_data.stage not in (DEAL_UNAPPROVED_STATUS_ID, DEAL_IS_EQUIPPED_STATUS_ID,
+    if user.deal_data.stage not in (DEAL_PROCESSED_1C_STATUS_ID, DEAL_UNAPPROVED_STATUS_ID, DEAL_IS_EQUIPPED_STATUS_ID,
                                     DEAL_FLORIST_STATUS_ID):
         return BW.BW_WRONG_STAGE
 
@@ -39,7 +39,7 @@ def update_deal_image(user: Operator):
 
     # switch to previous stage first in case of repeat equip - to trigger robots properly
     if user.equip.repeating:
-        BW.update_deal(deal_data.deal_id, {DEAL_STAGE_ALIAS: DEAL_FLORIST_STATUS_ID})
+        BW.update_deal(deal_data.deal_id, {DEAL_STAGE_ALIAS: DEAL_PROCESSED_1C_STATUS_ID})
 
     update_obj = {DEAL_SMALL_PHOTO_ALIAS: [], DEAL_BIG_PHOTO_ALIAS: [],
                   DEAL_STAGE_ALIAS: DEAL_IS_EQUIPPED_STATUS_ID,
