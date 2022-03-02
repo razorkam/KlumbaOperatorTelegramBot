@@ -5,7 +5,6 @@ DEAL_PAID_PREPAID_STATUS_ID = 'C17:UC_J0R30S'  # Оплачен \ Предопл
 DEAL_PROCESSED_WAITING_FOR_SUPPLY_STATUS_ID = 'C17:13'  # Обработан, но ждет поставки
 DEAL_PROCESSED_ON_HOLD_STATUS_ID = 'C17:6'  # Обработан,тов.отлож/не треб.
 DEAL_FLORIST_STATUS_ID = 'C17:7'  # У Флориста (Изготавливается)
-DEAL_PROCESSED_1C_STATUS_ID = 'C17:8'  # Обработан в 1С
 DEAL_IS_EQUIPPED_STATUS_ID = 'C17:NEW'  # Заказ укомплектован
 DEAL_UNAPPROVED_STATUS_ID = 'C17:9'  # Несогласовано
 DEAL_APPROVED_STATUS_ID = 'C17:10'  # Согласовано
