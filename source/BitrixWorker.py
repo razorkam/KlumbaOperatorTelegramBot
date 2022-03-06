@@ -43,10 +43,14 @@ DISTRICTS = {}
 DISTRICTS_LOCK = Lock()
 SOURCES = {}
 SOURCES_LOCK = Lock()
-BITRIX_USERS = []  # phone -> id mapping
+STAGES = {}
+STAGES_LOCK = Lock()
+BITRIX_USERS = {}  # phone -> id mapping
 # TODO: users mappings refactoring
-BITRIX_IDS_USERS = []  # id -> name + last name, auxiliary mapping
+BITRIX_IDS_USERS = {}  # id -> name + last name, auxiliary mapping
 BITRIX_USERS_LOCK = Lock()
+FESTIVE_DATES = []
+FESTIVE_DATES_LOCK = Lock()
 
 # Bitrix OAuth keys
 # store in Telegram bot persistence to serialize automatically
@@ -57,7 +61,7 @@ QUERY_LIMIT_EXCEEDED = 'QUERY_LIMIT_EXCEEDED'
 
 
 # if getter_method is True -> then result absence mead there is no such entity
-def send_request(method, params=None, handle_next=False, getter_method=False):
+def send_request(method, params=None, handle_next=False, getter_method=False, obtain_total=False):
     if params is None:
         params = {}
 
@@ -78,6 +82,9 @@ def send_request(method, params=None, handle_next=False, getter_method=False):
                 if error == QUERY_LIMIT_EXCEEDED:
                     time.sleep(SLEEP_INTERVAL)
                     continue
+
+                if obtain_total:
+                    return json.get('total')
 
                 next_counter = json.get('next')
                 result = json.get('result')
@@ -262,8 +269,8 @@ def load_active_users():
 
         for u in result:
             users_dict[Utils.prepare_phone_number(u[USER_MAIN_PHONE_ALIAS])] = u[USER_ID_ALIAS]
-            users_ids_dict[u[USER_ID_ALIAS]] = Utils.prepare_external_field(u, 'LAST_NAME') + ' ' + \
-                                               Utils.prepare_external_field(u, 'NAME')
+            users_ids_dict[u[USER_ID_ALIAS]] = Utils.prepare_external_field(u, 'LAST_NAME') if u.get('LAST_NAME') else '' + ' ' + \
+                                               Utils.prepare_external_field(u, 'NAME') if u.get('NAME') else ''
 
         global BITRIX_USERS
         global BITRIX_IDS_USERS
@@ -303,9 +310,38 @@ def _load_sources():
             SOURCES = result
 
 
+def _load_stages():
+    global STAGES
+    result = _load_reference(DEAL_STAGE_LIST_REFERENCE_ID)
+
+    if result:
+        with STAGES_LOCK:
+            STAGES = result
+
+
+# праздничные даты из списка
+def _load_festive_dates():
+    result = {}
+    params = {
+        'IBLOCK_TYPE_ID': 'lists',
+        'IBLOCK_ID': FESTIVE_LIST_IBLOCK_ID,
+    }
+
+    try:
+        result = list(send_request('lists.element.get', params)[0][FESTIVE_LIST_PROPERTY_NAME].values())
+
+    except Exception as e:
+        logging.error("Exception getting florists, %s", e)
+
+    global FESTIVE_DATES
+    if result:
+        with FESTIVE_DATES_LOCK:
+            FESTIVE_DATES = result
+
+
 def load_dicts():
     # TODO: batch load instead of sleep intervals workaround
-    sleep_interval = 2
+    sleep_interval = 1
     _load_couriers()
     time.sleep(sleep_interval)
     _load_florists()
@@ -323,6 +359,10 @@ def load_dicts():
     _load_districts()
     time.sleep(sleep_interval)
     _load_sources()
+    time.sleep(sleep_interval)
+    _load_stages()
+    time.sleep(sleep_interval)
+    _load_festive_dates()
 
 
 def refresh_oauth(refresh_token):

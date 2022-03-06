@@ -37,6 +37,7 @@ class DealData:
         self.recipient_name = None
         self.recipient_phone = None
         self.address = None
+        self.flat = None
         self.subdivision = None
         self.district = None
         self.order_big_photos = []

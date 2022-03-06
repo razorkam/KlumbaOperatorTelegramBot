@@ -12,13 +12,12 @@ import source.BitrixWorker as BW
 import source.utils.Utils as Utils
 import source.TelegramCommons as TgCommons
 import source.TextSnippets as GlobalTxt
-import source.cmd_handlers.Checklist.TgHandlers as CLHandlers
+import source.cmd_handlers.Send.TgHandlers as CLHandlers
 import source.cmd_handlers.SetCourier.BitrixHandlers as BH
-import source.cmd_handlers.Checklist.BitrixHandlers as ChecklistBH
-import source.cmd_handlers.Checklist.TextSnippets as ChecklistTxt
+import source.cmd_handlers.Send.BitrixHandlers as SendBH
+import source.cmd_handlers.Send.TextSnippets as SendTxt
 import source.cmd_handlers.SetCourier.TextSnippets as Txt
-import source.cmd_handlers.Checklist.TgHandlers as ChecklistHandlers
-
+import source.cmd_handlers.Send.TgHandlers as SendHandlers
 
 logger = logging.getLogger(__name__)
 
@@ -32,21 +31,21 @@ def set_deal_number(update, context: CallbackContext, user: Operator):
     if result == BW.BW_NO_SUCH_DEAL:
         TgCommons.send_mdv2(update.effective_user, GlobalTxt.NO_SUCH_DEAL.format(deal_id))
         return None
-    elif result == ChecklistBH.BH_ALREADY_HAS_COURIER:
+    elif result == SendBH.BH_ALREADY_HAS_COURIER:
         with BW.COURIERS_LOCK:
             courier = Utils.prepare_external_field(BW.COURIERS, user.deal_data.courier_id)
 
-        keyboard = [[InlineKeyboardButton(text=ChecklistTxt.CHANGE_COURIER_BUTTON_TEXT,
-                                          callback_data=ChecklistTxt.CHANGE_COURIER_BUTTON_CB)],
+        keyboard = [[InlineKeyboardButton(text=SendTxt.CHANGE_COURIER_BUTTON_TEXT,
+                                          callback_data=SendTxt.CHANGE_COURIER_BUTTON_CB)],
                     [InlineKeyboardButton(text=Txt.LEAVE_COURIER_BUTTON_TEXT.format(courier.upper()),
-                                          callback_data=ChecklistTxt.LEAVE_COURIER_BUTTON_CB)]]
-        TgCommons.send_mdv2(update.effective_user, ChecklistTxt.COURIER_ALREADY_SET_HEADER.format(courier.upper(),
-                                                                                                  deal_id),
+                                          callback_data=SendTxt.LEAVE_COURIER_BUTTON_CB)]]
+        TgCommons.send_mdv2(update.effective_user, SendTxt.COURIER_ALREADY_SET_HEADER.format(courier.upper(),
+                                                                                             deal_id),
                             keyboard)
-        return State.CHECKLIST_CHANGE_COURIER
+        return State.SEND_CHANGE_COURIER
 
-    ChecklistHandlers.send_couriers_header(update, context)
-    return State.CHECKLIST_SET_COURIER
+    SendHandlers.send_couriers_header(update, context, user)
+    return State.SEND_SET_COURIER
 
 
 @TgCommons.tg_callback
@@ -74,22 +73,22 @@ cv_handler = ConversationHandler(
     entry_points=[CallbackQueryHandler(callback=CLHandlers.request_deal_number,
                                        pattern=GlobalTxt.MENU_DEAL_COURIER_BUTTON_CB)],
     states={
-        State.CHECKLIST_SET_DEAL_NUMBER: [MessageHandler(Filters.regex(GlobalTxt.BITRIX_DEAL_NUMBER_PATTERN),
-                                                         set_deal_number)],
-        State.CHECKLIST_SET_COURIER: [MessageHandler(Filters.text, ChecklistHandlers.get_couriers_by_surname),
-                                      CallbackQueryHandler(callback=ChecklistHandlers.show_all_couriers,
-                                                           pattern=ChecklistTxt.SHOW_ALL_COURIERS_BUTTON_CB)],
-        State.CHECKLIST_CHOOSE_COURIER: [CallbackQueryHandler(callback=choose_courier,
-                                                              pattern=ChecklistTxt.COURIER_CHOOSE_BUTTON_PATTERN),
-                                         CallbackQueryHandler(callback=ChecklistHandlers.next_page,
-                                                              pattern=ChecklistTxt.NEXT_PAGE_CB),
-                                         CallbackQueryHandler(callback=ChecklistHandlers.prev_page,
-                                                              pattern=ChecklistTxt.PREV_PAGE_CB)
-                                         ],
-        State.CHECKLIST_CHANGE_COURIER: [CallbackQueryHandler(callback=ChecklistHandlers.change_courier,
-                                                              pattern=ChecklistTxt.CHANGE_COURIER_BUTTON_CB),
-                                         CallbackQueryHandler(callback=leave_courier,
-                                                              pattern=ChecklistTxt.LEAVE_COURIER_BUTTON_CB)],
+        State.SEND_SET_DEAL_NUMBER: [MessageHandler(Filters.regex(GlobalTxt.BITRIX_DEAL_NUMBER_PATTERN),
+                                                    set_deal_number)],
+        State.SEND_SET_COURIER: [MessageHandler(Filters.text, SendHandlers.get_couriers_by_surname),
+                                 CallbackQueryHandler(callback=SendHandlers.show_all_couriers,
+                                                      pattern=SendTxt.SHOW_ALL_COURIERS_BUTTON_CB)],
+        State.SEND_CHOOSE_COURIER: [CallbackQueryHandler(callback=choose_courier,
+                                                         pattern=SendTxt.COURIER_CHOOSE_BUTTON_PATTERN),
+                                    CallbackQueryHandler(callback=SendHandlers.next_page,
+                                                         pattern=SendTxt.NEXT_PAGE_CB),
+                                    CallbackQueryHandler(callback=SendHandlers.prev_page,
+                                                         pattern=SendTxt.PREV_PAGE_CB)
+                                    ],
+        State.SEND_CHANGE_COURIER: [CallbackQueryHandler(callback=SendHandlers.change_courier,
+                                                         pattern=SendTxt.CHANGE_COURIER_BUTTON_CB),
+                                    CallbackQueryHandler(callback=leave_courier,
+                                                         pattern=SendTxt.LEAVE_COURIER_BUTTON_CB)],
 
     },
     fallbacks=[CommandHandler([Cmd.START, Cmd.CANCEL], TgCommons.restart),

@@ -20,7 +20,7 @@ def set_deal_number(user: Operator, deal_id):
     user.deal_data.deal_id = deal_id
     user.deal_data.stage = deal.get(DEAL_STAGE_ALIAS)
 
-    if user.deal_data.stage not in (BFM.DEAL_PROCESSED_WAITING_FOR_SUPPLY_STATUS_ID,
+    if user.deal_data.stage not in (BFM.DEAL_PROCESSED_WAITING_FOR_SUPPLY_STATUS_ID, BFM.DEAL_PRINTED_STATUS_ID,
                                     BFM.DEAL_PROCESSED_ON_HOLD_STATUS_ID, BFM.DEAL_PAID_PREPAID_STATUS_ID):
         return BW.BW_WRONG_STAGE
 

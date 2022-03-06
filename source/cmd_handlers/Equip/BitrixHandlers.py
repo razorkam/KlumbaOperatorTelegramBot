@@ -30,6 +30,19 @@ def set_deal_number(user: Operator, deal_id):
         user.deal_data.has_postcard = True
         user.deal_data.postcard_text = Utils.prepare_external_field(deal, DEAL_POSTCARD_TEXT_ALIAS)
 
+    user.deal_data.courier_id = deal.get(DEAL_COURIER_NEW_ALIAS)
+    payment_type_id = Utils.prepare_external_field(deal, DEAL_PAYMENT_TYPE_ALIAS)
+    user.deal_data.payment_type = Utils.prepare_external_field(BW.PAYMENT_TYPES, payment_type_id, BW.PAYMENT_TYPES_LOCK)
+
+    terminal_change = Utils.prepare_external_field(deal, DEAL_TERMINAL_CHANGE_ALIAS)
+
+    if terminal_change == DEAL_NEED_TERMINAL:
+        user.deal_data.terminal_needed = True
+    elif terminal_change == DEAL_NEED_CHANGE:
+        user.deal_data.change_sum = Utils.prepare_external_field(deal, DEAL_CHANGE_SUM_ALIAS)
+
+    user.deal_data.to_pay = Utils.prepare_external_field(deal, DEAL_TO_PAY_ALIAS)
+
     return BW.BW_OK
 
 
@@ -44,21 +57,16 @@ def update_deal_image(user: Operator):
     update_obj = {DEAL_SMALL_PHOTO_ALIAS: [], DEAL_BIG_PHOTO_ALIAS: [],
                   DEAL_STAGE_ALIAS: DEAL_IS_EQUIPPED_STATUS_ID,
                   DEAL_CLIENT_URL_ALIAS: user.equip.digest,
-                  DEAL_EQUIPER_ID_ALIAS: user.bitrix_user_id}
-
-    is_takeaway = deal_data.supply_type == DEAL_IS_FOR_TAKEAWAY
+                  DEAL_EQUIPER_ID_ALIAS: user.bitrix_user_id,
+                  DEAL_CHECKLIST_ALIAS: {'fileData': [user.deal_data.photo_name,
+                                                      user.deal_data.photo_data]}
+                  }
 
     for photo in photos_list:
         update_obj[DEAL_SMALL_PHOTO_ALIAS].append({'fileData': [photo.name_small,
                                                                 photo.data_small]})
         update_obj[DEAL_BIG_PHOTO_ALIAS].append({'fileData': [photo.name_big,
                                                               photo.data_big]})
-
-    # load fake photo to checklist in case of takeaway deal
-    if is_takeaway:
-        fake_photo = photos_list[0]
-        update_obj[DEAL_CHECKLIST_ALIAS] = {'fileData': [fake_photo.name_small,
-                                                         fake_photo.data_small]}
 
     postcards_list = user.equip.encode_deal_postcards()
     if postcards_list:

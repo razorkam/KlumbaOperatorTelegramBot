@@ -27,8 +27,8 @@ def process_deals(user):
     elif deals_type == DealsType.IN_ADVANCE:
         stages = [BFM.DEAL_NEW_STATUS_ID, BFM.DEAL_IN_PROCESS_STATUS_ID, BFM.DEAL_PAID_PREPAID_STATUS_ID,
                   BFM.DEAL_PROCESSED_WAITING_FOR_SUPPLY_STATUS_ID, BFM.DEAL_PROCESSED_ON_HOLD_STATUS_ID,
-                  BFM.DEAL_FLORIST_STATUS_ID, BFM.DEAL_PROCESSED_1C_STATUS_ID, BFM.DEAL_IS_EQUIPPED_STATUS_ID,
-                  BFM.DEAL_UNAPPROVED_STATUS_ID, BFM.DEAL_APPROVED_STATUS_ID]
+                  BFM.DEAL_PRINTED_STATUS_ID, BFM.DEAL_FLORIST_STATUS_ID, BFM.DEAL_PROCESSED_1C_STATUS_ID,
+                  BFM.DEAL_IS_EQUIPPED_STATUS_ID, BFM.DEAL_UNAPPROVED_STATUS_ID, BFM.DEAL_APPROVED_STATUS_ID]
     elif deals_type == DealsType.FINISHED_IN_TIME:
         stages = [BFM.DEAL_SUCCESSFUL_STATUS_ID, BFM.DEAL_LOSE_STATUS_ID]
         dt = user.data.deals_date.isoformat()
@@ -51,7 +51,7 @@ def process_deals(user):
 
     params = {
         'filter': flt,
-        'select': [DEAL_ID_ALIAS, DEAL_DATE_ALIAS, DEAL_TIME_ALIAS, DEAL_ADDRESS_ALIAS,
+        'select': [DEAL_ID_ALIAS, DEAL_DATE_ALIAS, DEAL_TIME_ALIAS, DEAL_ADDRESS_ALIAS, DEAL_FLAT_ALIAS,
                    DEAL_RECIPIENT_NAME_ALIAS, DEAL_RECIPIENT_PHONE_ALIAS, DEAL_DISTRICT_ALIAS,
                    DEAL_DELIVERY_COMMENT_ALIAS, DEAL_INCOGNITO_ALIAS, DEAL_TERMINAL_CHANGE_ALIAS,
                    DEAL_CHANGE_SUM_ALIAS, DEAL_TO_PAY_ALIAS, DEAL_BIG_PHOTO_ALIAS, DEAL_SUBDIVISION_ALIAS,
@@ -69,6 +69,7 @@ def process_deals(user):
 
         address, location = Utils.prepare_deal_address(d, DEAL_ADDRESS_ALIAS)
         deal.address = address
+        deal.flat = Utils.prepare_external_field(d, DEAL_FLAT_ALIAS)
 
         deal.recipient_name = Utils.prepare_external_field(d, DEAL_RECIPIENT_NAME_ALIAS)
         deal.recipient_phone = Utils.prepare_external_field(d, DEAL_RECIPIENT_PHONE_ALIAS)

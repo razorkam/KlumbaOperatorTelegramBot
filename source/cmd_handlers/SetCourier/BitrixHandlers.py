@@ -4,7 +4,7 @@ import source.BitrixWorker as BW
 import source.utils.Utils as Utils
 from source.BitrixFieldsAliases import *
 import source.BitrixFieldMappings as BFM
-import source.cmd_handlers.Checklist.BitrixHandlers as ChecklistBH
+import source.cmd_handlers.Send.BitrixHandlers as SendBH
 from source.User import Operator
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ def set_deal_number(user: Operator, deal_id):
     user.deal_data.to_pay = Utils.prepare_external_field(deal, DEAL_TO_PAY_ALIAS)
 
     if user.deal_data.courier_id:
-        return ChecklistBH.BH_ALREADY_HAS_COURIER
+        return SendBH.BH_ALREADY_HAS_COURIER
 
     return BW.BW_OK
 

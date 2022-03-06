@@ -54,6 +54,7 @@ def render_cur_page(update, context, user, edit_message=False):
         message += Txt.DEAL_PREVIEW_TEMPLATE.format(Utils.escape_mdv2(deal_view_cmd), d.time, d.date,
                                                     d.address,
                                                     Txt.ADDRESS_RESOLUTION_LINK + Utils.escape_mdv2_textlink(d.address),
+                                                    d.flat,
                                                     d.recipient_name, d.recipient_phone,
                                                     Utils.escape_mdv2_textlink(d.recipient_phone),
                                                     d.district, d.delivery_comment, d.incognito,
@@ -180,6 +181,7 @@ def render_cur_deal(update, context, user):
 
     message = Txt.DEAL_VIEW_TEMPLATE.format(deal_id, d.time, d.date, d.address,
                                             Txt.ADDRESS_RESOLUTION_LINK + Utils.escape_mdv2_textlink(d.address),
+                                            d.flat,
                                             d.recipient_name, d.recipient_phone, d.recipient_phone,
                                             d.district, d.delivery_comment,
                                             d.incognito, deal_terminal, deal_change_sum, deal_to_pay,
@@ -212,6 +214,12 @@ def render_cur_deal(update, context, user):
 @TgCommons.tg_callback
 def view_deal(update, context, user):
     deal_id = context.match.group(1)
+
+    # TODO: !!!
+    if not user.data.deals_dict:
+        BitrixHandlers.process_deals(user)
+
+    logger.info(f'Courier {user.bitrix_user_id} viewing deal {deal_id} when deals type is {user.data.deals_type}, deals dict is {list(user.data.deals_dict.keys())}')
     user.deal_data.deal_id = deal_id  # save for future use commands based on deal view
 
     render_cur_deal(update, context, user)

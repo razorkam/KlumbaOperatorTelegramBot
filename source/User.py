@@ -9,7 +9,7 @@ from source.cmd_handlers.FloristOrder.UserData import UserData as FloristOrder
 from source.cmd_handlers.Reserve.UserData import UserData as Reserve
 from source.cmd_handlers.SetFlorist.UserData import UserData as Florist
 from source.cmd_handlers.Courier.UserData import UserData as CourierData
-from source.cmd_handlers.Checklist.UserData import UserData as ChecklistData
+from source.cmd_handlers.Send.UserData import UserData as SendData
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +20,8 @@ class Operator(BaseUser):
 
         # deal equipment (укомплектовать заказ)
         self.equip = EquipUserData()
-        # deal checklist (загрузка чек-листа, назначение курьера, перевод в доставке)
-        self.checklist = ChecklistData()
+        # deal send data (назначение курьера, перевод в доставке)
+        self.send = SendData()
         # step 5(florist orders listing)
         self.florist_order = FloristOrder()
         # reserve (Обработать заказ)
@@ -51,7 +51,7 @@ class Operator(BaseUser):
     def _clear_data(self):
         super()._clear_data()
         self.equip.clear()
-        self.checklist.clear()
+        self.send.clear()
         self.florist_order.clear()
         self.reserve.clear()
         self.florist.clear()

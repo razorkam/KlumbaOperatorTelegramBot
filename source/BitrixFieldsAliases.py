@@ -65,6 +65,7 @@ DEAL_TIME_FIELD_ID = '771'  # Время
 DEAL_SUBDIVISION_FIELD_ID = '1683'  # Подразделение, принявшее заказ
 DEAL_DISTRICT_FIELD_ID = '743'  # Район доставки
 DEAL_SOURCE_REFERENCE_ID = 'SOURCE'  # Источник сделки
+DEAL_STAGE_REFERENCE_ID = 'SOURCE'  # Источник сделки
 
 # user
 USER_ID_ALIAS = 'ID'
@@ -82,6 +83,7 @@ CONTACT_HAS_PHONE_ALIAS = 'HAS_PHONE'
 
 # http requests aliases
 WEBHOOK_DEAL_ID_ALIAS = 'deal_id'
+WEBHOOK_STAGE_ALIAS = 'stage'
 WEBHOOK_DEAL_FLORIST_ALIAS = 'florist'
 WEBHOOK_DEAL_RESPONSIBLE_ALIAS = 'responsible'
 WEBHOOK_DEAL_ORDER_ALIAS = 'order'
@@ -106,6 +108,16 @@ WEBHOOK_EQUIPPER_ALIAS = 'equipper'
 WEBHOOK_SOURCE_ALIAS = 'source'
 WEBHOOK_CONTACT_ALIAS = 'contact'
 WEBHOOK_HAS_RESERVE_ALIAS = 'has_reserve'
+WEBHOOK_RESERVE_DESC_ALIAS = 'reserve_desc'
+WEBHOOK_DISTRICT_ALIAS = 'district'
+WEBHOOK_ADDRESS_ALIAS = 'address'
+WEBHOOK_PAY_METHOD_ALIAS = 'pay_method'
+WEBHOOK_PAY_TYPE_ALIAS = 'pay_type'
+WEBHOOK_PREPAID_ALIAS = 'prepaid'
+WEBHOOK_TERMINAL_ALIAS = 'terminal'
+WEBHOOK_CHANGE_ALIAS = 'change'
+WEBHOOK_TO_PAY_ALIAS = 'to_pay'
+WEBHOOK_PAY_STATUS_ALIAS = 'pay_status'
 
 
 # festive approvement

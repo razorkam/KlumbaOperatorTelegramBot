@@ -3,7 +3,10 @@ import source.config as cfg
 from enum import Enum, auto
 from typing import Dict
 from datetime import datetime
+import logging
 from source.DealData import DealData
+
+logger = logging.getLogger(__name__)
 
 
 # use hardcoded deals per page number to simplify logic for now
@@ -34,6 +37,7 @@ class UserData:
         self.deals_dict[deal.deal_id] = deal
 
     def clear_deals(self):
+        logger.info(f'Clearing deals: {list(self.deals_dict.keys())}')
         self.deals_dict.clear()
 
     def get_deals_list(self):

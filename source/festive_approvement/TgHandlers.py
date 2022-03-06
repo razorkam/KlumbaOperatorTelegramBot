@@ -1,6 +1,6 @@
 import re
 from telegram.ext import ConversationHandler, MessageHandler, CallbackQueryHandler, Filters
-from telegram import Update, Chat, InlineKeyboardButton
+from telegram import Update, Chat, InlineKeyboardButton, InputMediaPhoto
 
 import source.festive_approvement.FestiveCBQ as FestiveCBQ
 import source.creds as creds
@@ -23,7 +23,8 @@ import source.BitrixFieldMappings as BFM
 @TgCommons.tg_callback(False)
 def festive_decision(update: Update, context, user):
     if not user:
-        TgCommons.send_mdv2_chat(update.effective_chat, Txt.USER_NOT_FOUND.format(update.effective_user.full_name))
+        TgCommons.send_mdv2_chat(update.effective_chat,
+                                 Txt.USER_NOT_FOUND.format(Utils.prepare_str(update.effective_user.full_name)))
         return None
 
     user.festive_data.clear()
@@ -42,7 +43,7 @@ def festive_decision(update: Update, context, user):
         user.festive_data.deal_id = deal_id
         user.festive_data.deal_message = update.effective_message
 
-        BH.get_info(deal_id, user)
+        BH.get_info(context, deal_id, user)
 
         msg = Txt.REQUEST_DECLINE_COMMENT.format(deal_id)
         TgCommons.send_mdv2_chat(chat=update.effective_chat, msg_text=msg,
@@ -58,18 +59,53 @@ def festive_comment(update: Update, context, user: BaseUser):
 
     # send message to unapproved chat firstly
     BH.decline_deal(deal_id, comment, user.bitrix_user_id)
-    unapproved_chat = Chat(bot=context.bot, id=creds.FESTIVE_UNAPPROVED_CHAT_ID, type=Chat.SUPERGROUP)
-    keyboard = [[InlineKeyboardButton(text=Txt.REAPPROVE_BUTTON_TEXT, callback_data=Txt.REAPPROVE_BUTTON_KEY_PREFIX +
-                                                                                    Cmd.CMD_DELIMETER + deal_id)]]
-    TgCommons.send_mdv2_chat(unapproved_chat, Txt.DECLINED_HEADER.format(deal_id) +
-                             Txt.DEAL_DECLINED.format(user.festive_data.deal_link, user.festive_data.deal_order,
-                                                      user.festive_data.deal_user_declined, Utils.prepare_str(comment)),
-                             keyboard)
 
-    TgCommons.send_mdv2_chat(update.effective_chat, Txt.DECLINED_HEADER.format(deal_id))
+    unapproved_chat_id = user.festive_data.subdiv_chat_id
 
-    TgCommons.edit_mdv2(deal_message, msg_text=Txt.DECLINED_HEADER.format('')
-                                               + deal_message.text_markdown_v2, need_cancel=False)
+    if unapproved_chat_id:
+        unapproved_chat = Chat(bot=context.bot, id=unapproved_chat_id, type=Chat.SUPERGROUP)
+        keyboard = [
+            [InlineKeyboardButton(text=Txt.REAPPROVE_BUTTON_TEXT, callback_data=Txt.REAPPROVE_BUTTON_KEY_PREFIX +
+                                                                                Cmd.CMD_DELIMETER + deal_id)]]
+
+        reserve_desc = HttpTxt.DEAL_RESERVE_DESC_ELT.format(user.festive_data.deal_reserve_desc) \
+            if user.festive_data.deal_reserve_desc != GlobalTxt.FIELD_IS_EMPTY_PLACEHOLDER else ''
+        prepaid = HttpTxt.DEAL_PREPAID_ELT.format(user.festive_data.deal_prepaid) \
+            if user.festive_data.deal_pay_type == BFM.DEAL_PAY_PREPAID_FRIENDLY else ''
+        terminal = HttpTxt.DEAL_TERMINAL_ELT.format(user.festive_data.deal_terminal) \
+            if user.festive_data.deal_pay_type == BFM.DEAL_PAY_PERSONAL_FRIENDLY else ''
+        change = HttpTxt.DEAL_CHANGE_ELT.format(user.festive_data.deal_change) \
+            if user.festive_data.deal_terminal != BFM.DEAL_PAY_TERMINAL_FRIENDLY else ''
+
+        if user.festive_data.photo_urls:
+            media_list = [InputMediaPhoto(media=el) for el in user.festive_data.photo_urls]
+            context.bot.send_media_group(chat_id=unapproved_chat_id, media=media_list)
+
+        TgCommons.send_mdv2_chat(unapproved_chat, Txt.DECLINED_HEADER.format(deal_id) +
+                                 Txt.DEAL_DECLINED.format(user.festive_data.deal_accepted,
+                                                          user.festive_data.deal_subdivision,
+                                                          Utils.prepare_str(comment), user.festive_data.deal_link,
+                                                          user.festive_data.deal_order,
+                                                          user.festive_data.deal_user_declined,
+                                                          user.festive_data.deal_date, user.festive_data.deal_time,
+                                                          user.festive_data.deal_sum,
+                                                          user.festive_data.deal_source,
+                                                          user.festive_data.deal_contact,
+                                                          reserve_desc, user.festive_data.deal_delivery_type,
+                                                          user.festive_data.deal_district,
+                                                          user.festive_data.deal_address,
+                                                          user.festive_data.deal_delivery_comment,
+                                                          user.festive_data.deal_pay_method,
+                                                          user.festive_data.deal_pay_type, prepaid, terminal, change,
+                                                          user.festive_data.deal_to_pay,
+                                                          user.festive_data.deal_pay_status
+                                                          ),
+                                 keyboard)
+
+        TgCommons.send_mdv2_chat(update.effective_chat, Txt.DECLINED_HEADER.format(deal_id))
+
+        TgCommons.edit_mdv2(deal_message, msg_text=Txt.DECLINED_HEADER.format('')
+                                                   + deal_message.text_markdown_v2, need_cancel=False)
 
     return ConversationHandler.END
 
@@ -79,8 +115,11 @@ def festive_reapprove(update: Update, context, user: BaseUser):
     deal_id = context.match.group(1)
     deal = BW.get_deal(deal_id)
 
+    stage_id = deal.get(BFA.DEAL_STAGE_ALIAS)
+    deal_stage = Utils.prepare_external_field(BW.STAGES, stage_id, BW.STAGES_LOCK)
+
     deal_order = Utils.prepare_external_field(deal, BFA.DEAL_ORDER_ALIAS)
-    deal_responsible = Utils.prepare_external_field(deal, BFA.DEAL_ASSIGNED_ALIAS)
+
     deal_date = Utils.prepare_deal_date(deal, BFA.DEAL_DATE_ALIAS)
     deal_time = Utils.prepare_deal_time(deal, BFA.DEAL_TIME_ALIAS)
     deal_sum = Utils.prepare_external_field(deal, BFA.DEAL_TOTAL_SUM_ALIAS)
@@ -102,7 +141,35 @@ def festive_reapprove(update: Update, context, user: BaseUser):
     subdivision_id = Utils.prepare_external_field(deal, BFA.DEAL_SUBDIVISION_ALIAS)
     deal_subdivision = Utils.prepare_external_field(BW.SUBDIVISIONS, subdivision_id, BW.SUBDIVISIONS_LOCK)
 
-    deal_has_reserve = Utils.prepare_external_field(deal, BFA.WEBHOOK_HAS_RESERVE_ALIAS)
+    deal_has_reserve = Utils.prepare_external_field(deal, BFA.DEAL_ORDER_HAS_RESERVE_ALIAS)
+    deal_reserve_desc = Utils.prepare_external_field(deal, BFA.DEAL_ORDER_RESERVE_DESC_ALIAS)
+
+    deal_delivery_type = Utils.prepare_deal_supply_method(deal, BFA.DEAL_SUPPLY_METHOD_ALIAS)
+
+    district_id = Utils.prepare_external_field(deal, BFA.DEAL_DISTRICT_ALIAS)
+    deal_district = Utils.prepare_external_field(BW.DISTRICTS, district_id, BW.DISTRICTS_LOCK)
+
+    address, location = Utils.prepare_deal_address(deal, BFA.DEAL_ADDRESS_ALIAS)
+    deal_address = address
+
+    deal_delivery_comment = Utils.prepare_external_field(deal, BFA.DEAL_DELIVERY_COMMENT_ALIAS)
+
+    payment_type_id = Utils.prepare_external_field(deal, BFA.DEAL_PAYMENT_TYPE_ALIAS)
+    deal_pay_type = Utils.prepare_external_field(BW.PAYMENT_TYPES, payment_type_id, BW.PAYMENT_TYPES_LOCK)
+
+    payment_method_id = Utils.prepare_external_field(deal, BFA.DEAL_PAYMENT_METHOD_ALIAS)
+    deal_pay_method = Utils.prepare_external_field(BW.PAYMENT_METHODS, payment_method_id,
+                                                   BW.PAYMENT_METHODS_LOCK)
+
+    deal_prepaid = Utils.prepare_external_field(deal, BFA.DEAL_PREPAID_ALIAS)
+
+    deal_terminal = Utils.prepare_external_field(BW.DEAL_TERMINAL_CHANGE_MAPPING,
+                                                 Utils.prepare_external_field(deal, BFA.DEAL_TERMINAL_CHANGE_ALIAS))
+    deal_change = Utils.prepare_external_field(deal, BFA.DEAL_CHANGE_SUM_ALIAS)
+
+    deal_to_pay = Utils.prepare_external_field(deal, BFA.DEAL_TO_PAY_ALIAS)
+
+    deal_pay_status = Utils.prepare_external_field(deal, BFA.DEAL_PAYMENT_STATUS_ALIAS)
 
     if deal_has_reserve == BFM.DEAL_HAS_RESERVE_YES:
         with BW.BITRIX_USERS_LOCK:
@@ -112,9 +179,13 @@ def festive_reapprove(update: Update, context, user: BaseUser):
         photo_urls = None
 
     BH.reapprove_deal(deal_id)
-    HttpJobs.send_festive_deal_message(context.bot, deal_id, deal_order, deal_responsible,
+    HttpJobs.send_festive_deal_message(context.bot, deal_id, deal_stage, deal_order,
                                        deal_date, deal_time, deal_sum, deal_accepted,
-                                       deal_source, deal_contact, deal_subdivision, photo_urls)
+                                       deal_source, deal_contact, deal_subdivision, deal_reserve_desc,
+                                       deal_delivery_type, deal_district, deal_address, deal_delivery_comment,
+                                       deal_pay_method, deal_pay_type, deal_prepaid, deal_terminal, deal_change,
+                                       deal_to_pay, deal_pay_status,
+                                       photo_urls)
 
     edited_msg = re.sub(re.escape(Txt.DECLINED_HEADER.format(deal_id)), Txt.REAPPROVED_HEADER.format(deal_id),
                         update.effective_message.text_markdown_v2)

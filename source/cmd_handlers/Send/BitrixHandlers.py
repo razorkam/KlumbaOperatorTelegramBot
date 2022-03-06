@@ -42,10 +42,8 @@ def set_deal_number(user: Operator, deal_id):
     return BW.BW_OK
 
 
-def update_deal_checklist(user: Operator):
-    update_obj = {DEAL_CHECKLIST_ALIAS: {'fileData': [user.deal_data.photo_name,
-                                                      user.deal_data.photo_data]},
-                  DEAL_STAGE_ALIAS: BFM.DEAL_IS_IN_DELIVERY_STATUS_ID,
+def send_deal(user: Operator):
+    update_obj = {DEAL_STAGE_ALIAS: BFM.DEAL_IS_IN_DELIVERY_STATUS_ID,
                   DEAL_COURIER_NEW_ALIAS: user.deal_data.courier_id,
                   DEAL_SENDER_ID_ALIAS: user.bitrix_user_id}
 

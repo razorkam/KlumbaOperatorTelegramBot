@@ -9,7 +9,7 @@ CHANGE_COURIER_BUTTON_CB = 'change_courier'
 LEAVE_COURIER_BUTTON_TEXT = 'Отправить с курьером {}'
 LEAVE_COURIER_BUTTON_CB = 'leave_courier'
 
-CHOOSE_COURIER_HEADER = '*ВВЕДИТЕ НАЧАЛО ФАМИЛИИ КУРЬЕРА:*:'
+CHOOSE_COURIER_HEADER = '*ВВЕДИТЕ НАЧАЛО ФАМИЛИИ КУРЬЕРА:*'
 SHOW_ALL_COURIERS_BUTTON_TEXT = 'Показать весь список'
 SHOW_ALL_COURIERS_BUTTON_CB = 'show_all'
 
@@ -31,7 +31,6 @@ DEAL_TEMPLATE = 'Заказ *{}*\n' \
                 'Тип оплаты: {}\n' \
                 '{}' \
                 '{}' \
-                'К оплате: {}\n\n' \
-                'Загрузите *фото бумажного чек\\-листа*'
+                'К оплате: {}\n\n'
 
 DEAL_UPDATED = 'Заказ {} отправлен с курьером {}\\!'

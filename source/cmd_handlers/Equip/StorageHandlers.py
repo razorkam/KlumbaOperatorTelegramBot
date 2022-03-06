@@ -34,10 +34,12 @@ def init_db():
 
 def save_deal(user, deal_id):
     photos = user.equip.photos
+    logger.info(f'Saving {len(photos)} photos now')
 
     order_digest = ''
     all_is_on_disk = True
     for p in photos:
+        logger.info(f'Photo file {p.name_big} has state {p.state}')
         order_digest += p.name_big
         if not p.has_been_saved():
             all_is_on_disk = False

@@ -49,6 +49,7 @@
           - undecorated
           - pexpect
           - python-telegram-bot
+          - traceback-with-variables
     - name: Copy workdir
       synchronize:
         src: '{{ playbook_dir }}'

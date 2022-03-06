@@ -6,19 +6,19 @@ class State:
     IN_OPERATOR_MENU = 2
 
     # equip deal
-    EQUIP_SET_DEAL_NUMBER = 3 # Запрошен номер заказа
+    EQUIP_SET_DEAL_NUMBER = 3  # Запрошен номер заказа
     EQUIP_REPEATEDLY_APPROVE = 4  # Подтверждаем, что хотим повторно укомплектовать заказ
-    EQUIP_SET_PHOTOS = 5 # Загружаем фото заказа
+    EQUIP_SET_PHOTOS = 5  # Загружаем фото заказа
     EQUIP_SET_POSTCARD_FACIAL = 6  # Загружаем лицевую сторону открытки
     EQUIP_SET_POSTCARD_REVERSE = 7  # Загружаем оборотную сторону открытки
+    EQUIP_SET_CHECKLIST = 8  # Запрошено фото бумажного чек-листа
 
-    # checklist loading actions
-    CHECKLIST_SET_DEAL_NUMBER = 8  # Запрошен номер заказа
-    CHECKLIST_CHANGE_COURIER = 9  # Запрошена реакция на изменение курьера
-    CHECKLIST_SET_COURIER = 10  # Запрошен выбор полный список / начало фамилии
-    CHECKLIST_CHOOSE_COURIER = 11  # Запрошен выбор курьера из списка
-    CHECKLIST_COURIER_EQUIPPED_REQUEST = 12  # Обеспечен ли курьер?
-    CHECKLIST_SET_PHOTO = 13   # Запрошено фото бумажного чек-листа
+    # send order loading actions
+    SEND_SET_DEAL_NUMBER = 9  # Запрошен номер заказа
+    SEND_CHANGE_COURIER = 10  # Запрошена реакция на изменение курьера
+    SEND_SET_COURIER = 11  # Запрошен выбор полный список / начало фамилии
+    SEND_CHOOSE_COURIER = 12  # Запрошен выбор курьера из списка
+    SEND_COURIER_EQUIPPED_REQUEST = 13  # Обеспечен ли курьер?
 
     # process order
     PROCESS_SETTING_DEAL_NUMBER = 14  # Запрошен номер заказа

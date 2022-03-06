@@ -1,3 +1,6 @@
+import logging
+import os
+from traceback_with_variables import activate_by_import
 from telegram import Chat
 
 import source.creds as creds
@@ -14,17 +17,14 @@ from source.State import State
 import source.User as User
 
 import source.cmd_handlers.Equip.TgHandlers as Equip
-import source.cmd_handlers.Checklist.TgHandlers as Checklist
+import source.cmd_handlers.Send.TgHandlers as Send
 import source.cmd_handlers.SetCourier.TgHandlers as SetCourier
 import source.cmd_handlers.SetFlorist.TgHandlers as SetFlorist
 import source.cmd_handlers.FloristOrder.TgHandlers as FloristOrder
 import source.cmd_handlers.Reserve.TgHandlers as Reserve
 import source.cmd_handlers.Courier.TgHandlers as Courier
 import source.festive_approvement.TgHandlers as FestiveApprovement
-
-import logging
-import os
-import traceback
+import source.festive_approvement.Statistics as FestiveStats
 
 from telegram.ext import Updater, MessageHandler, Filters, PicklePersistence, \
     ConversationHandler, CommandHandler, CallbackContext, CallbackQueryHandler
@@ -72,11 +72,6 @@ def error_handler(update, context: CallbackContext):
     try:
         logger.error(msg="Exception while handling Telegram update:", exc_info=context.error)
 
-        tb_list = traceback.format_exception(None, context.error, context.error.__traceback__)
-        tb_string = ''.join(tb_list)
-
-        logger.error(tb_string)
-
         # don't confuse user with particular error data
         if update:
             if update.effective_chat.type == Chat.PRIVATE:
@@ -89,7 +84,7 @@ def error_handler(update, context: CallbackContext):
 
 
 MENU_HANDLERS = [Equip.cv_handler,
-                 Checklist.cv_handler,
+                 Send.cv_handler,
                  SetCourier.cv_handler,
                  SetFlorist.cv_handler,
                  FloristOrder.cv_handler,
@@ -144,7 +139,10 @@ def run():
     global JOB_QUEUE
     JOB_QUEUE = jq
 
+    # refresh oauth
     jq.run_repeating(bitrix_oauth_update_job, interval=cfg.BITRIX_OAUTH_UPDATE_INTERVAL, first=1)
+    # start festive statistics jobs
+    FestiveStats.jq_add_festive_stats(jq)
 
     dispatcher.add_handler(FestiveApprovement.FESTIVE_CV_HANDLER)
     dispatcher.add_handler(FestiveApprovement.FESTIVE_REAPPROVE_HANDLER)
